@@ -25,9 +25,9 @@ pub const SUPPORTED_SAMPLE_RATES: [u32; 8] = [
     44_100, 48_000, 88_200, 96_000, 176_400, 192_000, 352_800, 384_000,
 ];
 
-/// BCS mirror of the Move `audio_verifier::audio_verifier::AudioPayload`, field for field.
+/// BCS mirror of the Move `audio_verifier::audio_verifier::AudioVerificationPayload`, field for field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AudioPayload {
+pub struct AudioVerificationPayload {
     /// Canonical format name.
     pub format: String,
     /// Channel count.
@@ -45,8 +45,8 @@ pub struct AudioPayload {
     pub blob_id: [u8; 32],
 }
 
-/// Measures a canonical FLAC file into a Move-layout `AudioPayload`.
-pub fn measure(bytes: &[u8]) -> Result<AudioPayload, Error> {
+/// Measures a canonical FLAC file into a Move-layout `AudioVerificationPayload`.
+pub fn measure(bytes: &[u8]) -> Result<AudioVerificationPayload, Error> {
     let info = StreamInfo::parse_canonical(bytes)?;
     info.validate()?;
     let (pcm_digest, blob_id) = thread::scope(|scope| {
@@ -59,7 +59,7 @@ pub fn measure(bytes: &[u8]) -> Result<AudioPayload, Error> {
     });
     let pcm_digest = pcm_digest?;
     let blob_id = blob_id?;
-    Ok(AudioPayload {
+    Ok(AudioVerificationPayload {
         format: FORMAT.to_owned(),
         channels: info.channels,
         bit_depth: info.bit_depth,

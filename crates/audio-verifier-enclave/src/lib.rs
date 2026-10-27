@@ -1,11 +1,13 @@
 use std::time::Duration;
 
-use audio_verifier::{AudioPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal};
+use audio_verifier::{
+    AudioVerificationPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal,
+};
 use axum::{Router, body::Bytes};
 use nautilus::{ConfigError, Intent, NautilusContext, NautilusError, ServerConfig, SignedResponse};
 use serde::{Deserialize, Serialize};
 
-/// Intent of the signed `IntentMessage<AudioPayload>`.
+/// Intent of the signed `IntentMessage<AudioVerificationPayload>`.
 pub const AUDIO_INTENT: Intent = Intent(0);
 
 /// Default `/process_data` body limit.
@@ -35,7 +37,7 @@ pub const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 /// Environment variable that overrides the body limit.
 pub const MAX_BODY_BYTES_ENV: &str = "AUDIO_VERIFIER_MAX_BODY_BYTES";
 
-/// JSON view of a signed `AudioPayload`.
+/// JSON view of a signed `AudioVerificationPayload`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AudioJson {
     /// Canonical format name.
@@ -56,8 +58,8 @@ pub struct AudioJson {
     pub blob_id_u256: String,
 }
 
-impl From<&AudioPayload> for AudioJson {
-    fn from(audio: &AudioPayload) -> Self {
+impl From<&AudioVerificationPayload> for AudioJson {
+    fn from(audio: &AudioVerificationPayload) -> Self {
         Self {
             format: audio.format.clone(),
             channels: audio.channels,
@@ -86,10 +88,10 @@ pub struct ProcessDataResponse {
     pub public_key: String,
 }
 
-/// Renders a signed `AudioPayload` as the `/process_data` response.
+/// Renders a signed `AudioVerificationPayload` as the `/process_data` response.
 pub fn response(
     ctx: &NautilusContext,
-    signed: SignedResponse<AudioPayload>,
+    signed: SignedResponse<AudioVerificationPayload>,
 ) -> ProcessDataResponse {
     ProcessDataResponse {
         intent: signed.response.intent.0,

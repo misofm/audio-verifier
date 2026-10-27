@@ -1,176 +1,72 @@
 # audio-verifier
 
-Audio whose technical facts were measured inside a [Nautilus](https://github.com/MystenLabs/nautilus) enclave (AWS Nitro) and checked on Sui.
+Measures FLAC audio inside a Nautilus enclave on AWS Nitro and verifies the signed results on Sui. It checks the decoded audio, computes a BLAKE3 PCM digest and Walrus blob ID, and signs an `AudioVerificationPayload` containing the audio's format, channels, bit depth, sample rate, sample count, and digests.
 
-[`misofm/audio`](https://github.com/misofm/audio) defines `Audio<AudioVerifier>`, lossless audio facts vouched for by a verifier witness type. This repository is one verifier: `audio_verifier::verify` returns **`Audio<audio_verifier::audio_verifier::AudioVerifier>`**, and only a signature from a registered `Enclave<AUDIO_VERIFIER>` can produce one. Consumers that trust this enclave pin that type.
+The Move package verifies the enclave signature and returns `Audio<AudioVerifier>` for use by other applications. This verifies technical properties of the file; it does not establish authorship, ownership, or availability on Walrus.
 
-## How it works
+## Supported input
 
-```
-client ──FLAC bytes──▶ enclave (audio-verifier-enclave)
-                         measure: canonical FLAC, per-frame checks, MD5, BLAKE3 PCM digest,
-                                  Walrus blob ID recomputed from the bytes
-                         sign:    bcs(IntentMessage { intent: 0, timestamp_ms, payload: AudioPayload })
-client ◀──JSON + signature──
-client ──PTB──▶ audio_verifier::verify(enclave, facts…, timestamp_ms, signature) ──▶ Audio<AudioVerifier>
-                 ├─ kagi::enclave::verify_signature
-                 └─ audio::new(AudioVerifier(), facts…, unencrypted WalrusBlob)
-```
+The service accepts canonical FLAC files with:
 
-- **The enclave needs no outbound network.** The client uploads the bytes, and the enclave recomputes the Walrus blob ID itself with [`walrus-blob-encoder`](https://github.com/unconfirmedlabs/walrus-blob-encoder), using 1,000 shards as mainnet does. Its blob IDs are byte-identical to `walrus-core` `c377852` and the `walrus` CLI 1.58.1. It never trusts an aggregator.
-- **Canonical FLAC only:**
-  - STREAMINFO is the only metadata block, with a non-zero MD5 and a non-zero sample count. Strip tags first with `metaflac --remove-all --dont-use-padding`.
-  - 8, 16 or 24 bits, at 44.1 or 48 kHz or their doublings up to 384 kHz. This is stricter than `audio::new`, which accepts 1 to 32 bits and any non-zero rate. 32-bit FLAC remains excluded by the attestation policy.
-  - Every frame's channels, bits per sample and sample rate must match STREAMINFO, so the signed facts describe the audio that was actually decoded, not a header the uploader wrote.
-  - Every other STREAMINFO field must match the decoded stream too, so the file makes no claim that isn't checked:
-    - the decoded sample count must equal total samples, and the decoded PCM MD5 must equal the MD5;
-    - block sizes must satisfy `16 <= min_block_size <= max_block_size`. Every frame but the last must have `min_block_size <= samples <= max_block_size`, and the last frame `samples <= max_block_size`. With two or more frames, `min_block_size` must equal the smallest frame before the last, and `max_block_size` the largest frame. A single frame may be shorter than both, because libFLAC and ffmpeg write the configured block size;
-    - frame sizes, in bytes from the frame header through the CRC-16, may be 0 for unknown. Otherwise `min_frame_size` must equal the smallest frame and `max_frame_size` the largest. ffmpeg and libFLAC write exact values.
-  - Frames must follow STREAMINFO and each other with no gap, no bytes left over and no change of blocking strategy. Their frame or sample numbers must count from 0 in the shortest coding.
-- **`pcm_digest`** follows the `audio` spec: BLAKE3 over the decoded PCM, interleaved by sample frame, each sample a signed little-endian two's-complement integer of `ceil(bit_depth / 8)` bytes, sign-extended. For the bit depths accepted here, that's the same stream FLAC's MD5 covers.
-- **The signed payload is `AudioPayload`:** `format`, `channels`, `bit_depth`, `sample_rate_hz`, `samples_per_channel`, `pcm_digest`, `blob_id`, in that order. On-chain, kagi checks the signature against a registered `Enclave<AUDIO_VERIFIER>`, and `audio::new` validates the fields and emits `AudioCreatedEvent<AudioVerifier>`.
+- STREAMINFO as the only metadata block, with a nonzero MD5 and sample count.
+- 8-, 16-, or 24-bit samples.
+- Sample rates of 44.1, 48, 88.2, 96, 176.4, 192, 352.8, or 384 kHz.
+- Metadata and frame contents that agree with the decoded audio.
 
-## Layout
+Uploads default to a 256 MiB limit. Decoded PCM is limited to 4 GiB across all channels. Non-FLAC files and invalid audio are rejected without a signature.
 
-```
-move/                          Move package audio_verifier (see move/README.md)
-crates/libflac/                libFLAC 1.5.0's stream decoder, vendored, behind a safe callback interface
-crates/audio-verifier/         measurement library: FLAC rules, decode, digests, blob ID, AudioPayload
-crates/audio-verifier-enclave/ the enclave HTTP service (POST /process_data)
-vectors/audio_intent.json      cross-language signing vector, generated by Rust and pinned in Move
-```
+## Run locally
 
-## Building and testing
+Install Rust using the version in `rust-toolchain.toml` and a C compiler, then start the development service:
 
 ```sh
-cargo test --workspace
-cargo test --workspace --features audio-verifier-enclave/dev
-cargo clippy --workspace --all-targets -- -D warnings
-(cd move && sui move test --coverage)
+cargo run --locked -p audio-verifier-enclave --features dev
 ```
 
-The decoder is the reference libFLAC 1.5.0. `crates/libflac` vendors only its
-stream-decoder sources, taken from the release archive by
-`scripts/vendor-libflac.sh`, which checks the archive's SHA-256. `build.rs`
-compiles them with the `cc` crate and passes the configuration as defines, so
-there is no CMake, no Ogg, no encoder and no generated `config.h`. On x86-64,
-libFLAC's runtime CPU detection selects its BMI2 Rice decoder when the host has it. `src/layout.c`
-checks at build time that the struct offsets declared in Rust match libFLAC's.
+This listens on `127.0.0.1:3000` with a fixed development identity. It is for local testing only.
 
-`Containerfile.eif` compiles the enclave's Rust for `-C target-cpu=x86-64-v4 -C target-feature=+gfni`,
-so walrus-blob-encoder selects its AVX-512 and GFNI kernels at compile time. RUSTFLAGS do not
-reach C compiled through `cc`, so libFLAC builds for the C compiler's default x86-64 and keeps
-its runtime CPU detection.
-
-All `unsafe` code lives in `crates/libflac`; `audio-verifier` keeps the workspace's
-`forbid(unsafe_code)`. The wrapper decodes strictly. The first error libFLAC
-reports ends the decode, so libFLAC never resynchronises, skips bytes, or fills a
-missing frame with silence. Each frame reaches `audio-verifier` with its exact
-byte range and decoded samples.
-
-`audio-verifier` then applies the canonical rules. Errors map to the typed `Error`
-variants, or to `Error::Decode` for libFLAC errors and frame-numbering faults. It
-parses each frame's header from the frame's own bytes, which gives two things
-libFLAC doesn't:
-
-- **Frame numbering.** The blocking strategy and the coded frame or sample
-  number, which must count from 0 without gaps and use the shortest coding.
-  libFLAC accepts overlong codings.
-- **A contiguity check.** The header's CRC-8 and block size must agree with
-  libFLAC's, so each frame starts exactly where the previous one ended.
-
-libFLAC stops without error at a truncated final frame, so the last complete
-frame must end at the end of the input. Packed PCM feeds the existing
-four-buffer MD5/BLAKE3 pipeline; libFLAC's own MD5 check is off.
-
-To emit complete payloads and measurement times without including file I/O:
+Prepare a copy of your FLAC file by removing tags and other metadata with `metaflac` (from the FLAC tools), then upload it:
 
 ```sh
-MEASURE_REPEAT=5 cargo run --release --locked -p audio-verifier --example measure -- audio.flac
+cp audio.flac canonical.flac
+metaflac --remove-all --dont-use-padding canonical.flac
+curl --fail-with-body http://127.0.0.1:3000/process_data \
+  -H 'Content-Type: application/octet-stream' \
+  --data-binary @canonical.flac
 ```
 
-The measurement tests can also save each distinct input and its payload or rejection
-for a decoder migration. Run the same suite before and after the swap, then compare
-accepted payloads and verdicts (low-level error wording may differ). Apply the test-only
-capture helper from `tests/measure.rs` to the original revision too; it leaves its
-assertions intact. Use `target/before` first and `target/after` for the replacement:
+The JSON response contains `audio`, `intent`, `timestamp_ms`, `signature`, and `public_key`. The blob ID refers to the exact uploaded bytes, so use the same canonical file if you store it on Walrus.
+
+Set the upload limit with `--max-body-bytes` after Cargo's `--`, or with `AUDIO_VERIFIER_MAX_BODY_BYTES`. The service processes one request at a time; concurrent uploads receive HTTP 429. Invalid audio receives HTTP 422 and oversized uploads receive HTTP 413.
+
+## Use on Sui
+
+Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. Pass the returned audio fields, timestamp, and signature to `audio_verifier::audio_verifier::verify`. It verifies the signature against the registered enclave and returns `Audio<AudioVerifier>`.
+
+See [move/README.md](move/README.md) for the API and policy setup.
+
+## Run in an enclave
+
+The production build requires AWS Nitro's NSM device and serves HTTP on vsock port 3000. The enclave image requires an x86-64 CPU with AVX-512 and GFNI support.
+
+With Docker available, build the image; on a configured Nitro host with `nitro-cli`, run it:
 
 ```sh
-AUDIO_VERIFIER_MIGRATION_RESULTS="$PWD/target/before" \
-  cargo test --locked -p audio-verifier --test measure -- --test-threads=1
-python3 -I scripts/compare-decoder-results.py target/before target/after
+make eif
+make run-eif
 ```
 
-- **Fixtures** in `crates/audio-verifier/tests/fixtures/` come from `generate.sh`, which uses ffmpeg and, for the `libflac_*` files, the `flac` CLI.
-- **Cross-checks:**
-  - digests are compared with ffmpeg's raw decode when ffmpeg is installed;
-  - blob IDs are compared with `walrus-core` on the fixtures and on generated sizes around the symbol-size boundaries, with the committed `walrus blob-id --n-shards 1000` output, and with a live CLI when `WALRUS_CLI` is set.
-- **The default build is production only.** It uses `NautilusContext::from_runtime()`, which opens `/dev/nsm`, self-checks attestation, and exits if the device is missing. It serves HTTP directly on enclave vsock port 3000 with `nautilus::serve_vsock`. `--features dev` turns on nautilus's `test-utils` and its fixed development identity on TCP `127.0.0.1:3000`, so it must never be built into an enclave image. nautilus-rust's `scripts/assert-no-test-utils.sh` checks that in the image build.
-- **AVX-512 EC2 families only:** c6i, m6i, r6i, c7i, m7i, r7i, c7a and m7a. Before anything else, the enclave checks CPUID for AVX-512 F, DQ, CD, BW and VL and GFNI, and `/proc/cpuinfo` for the kernel's support, and exits naming what is missing. Dev builds skip the check.
-- **Boot self-test.** Before serving, the enclave decodes two embedded fixtures and computes three blob IDs at 10 shards, which run the same hashing and Reed-Solomon kernels as mainnet. It compares them with recorded digests and blob IDs and refuses to start on a mismatch. It takes about 11 ms. The 1,000-shard layout is covered by the tests against the committed CLI output.
-- **The parent instance bridges clients to the enclave**, for example with `socat TCP-LISTEN:3000,bind=127.0.0.1,reuseaddr,fork,max-children=256 VSOCK-CONNECT:<cid>:3000`. See nautilus-rust's [docs/host-bridge.md](https://github.com/unconfirmedlabs/nautilus-rust/blob/46a9d27777bc749f76eb5ae1360eb77d2361a94d/docs/host-bridge.md). The enclave needs no outbound bridge.
-- **Decoded work is bounded.** The service rejects uploads declaring more than 4 GiB of decoded PCM across all channels before starting measurement. The decoder rejects frames as soon as they exceed the declared sample count. This bounds expansion from highly compressed audio; it also means some otherwise valid long recordings are rejected with HTTP 422.
-- **One request at a time.** The service runs on nautilus-rust's router with `max_concurrent: 1`. The permit is taken before the body is read, and the measurement runs on the blocking pool, so a second upload gets 429 and only one body is ever buffered. The upload must arrive within 90 s, about 3 MB/s for 256 MiB, and the whole request within 120 s. Up to 256 connections may be open at once, matching the bridge's `max-children`. Idle connections cost little, because the permit comes before the body; with a cap of 8, 20 idle TCP connections on a Nitro host locked out every request, `/health_check` included, until the 10 s header timeout reaped them. The body limit defaults to 256 MiB; set it with `--max-body-bytes` or `AUDIO_VERIFIER_MAX_BODY_BYTES`. On the c6i parent, a 247 MiB file measured in about 3 s and peaked at about 425 MB RSS, so size enclave memory to at least twice the body limit, plus the image.
+The image is written to `out/nitro.eif`. The default enclave allocation is four vCPUs and 6144 MiB of memory. Bridge clients to vsock port 3000 through the parent instance, and register the image's PCR measurements through the Move enclave policy before using its signatures on-chain. Never enable the `dev` feature in a production image.
 
-## Decoder migration validation
+## Test
 
-The swap from `flac-decoder` at `13d0c4d` to libFLAC 1.5.0 was compared on three
-input sets, both builds running `measure()` on every input:
+```sh
+cargo test --locked --workspace
+(cd move && sui move test)
+```
 
-| Input set | Inputs | Accepted | Rejected | Verdict or payload changes |
-|---|---:|---:|---:|---:|
-| Every input the measurement tests pass to `measure()` | 81 | 19 | 62 | 0 |
-| `flac-decoder`'s CELLAR and matrix corpora, the fixtures and the benchmark files | 185 | 13 | 172 | 0 |
-| The same corpus files stripped to STREAMINFO alone, so frame checks run | 165 | 117 | 48 | 0 |
-
-Every accepted `AudioPayload` matches field for field. Ten rejection messages
-change wording, all within `Error::Decode`: truncation and frame-number faults are
-now reported by libFLAC or by the frame header check.
-
-`flac-decoder`'s strictness notes list one construct that libFLAC accepts and it
-rejected, and that this verifier now accepts: a residual partition exactly as long
-as the predictor order, where RFC 9639 9.2.7 requires it to be longer. No corpus
-file uses it, and the decoded PCM must still match the STREAMINFO MD5.
-
-Full `measure()` timing on a shared AMD EPYC 7313P development host, CPUs 2–5,
-Rust 1.94.1, generic `x86-64`, release fat LTO, best of five fresh processes per
-version, alternating which version runs first:
-
-| Input | flac-decoder | libFLAC | Elapsed change |
-|---|---:|---:|---:|
-| s16_44k_010s.flac | 0.1341 s | 0.1288 s | -4.0% |
-| s16_44k_240s.flac | 0.1493 s | 0.1637 s | +9.7% |
-| s24_96k_240s.flac | 0.3004 s | 0.4108 s | +36.7% |
-| s24_192k_480s.flac | 1.2618 s | 1.3976 s | +10.8% |
-
-A 12-pair rerun of the noisy 96 kHz input gave +22.4%. libFLAC decodes more slowly
-than `flac-decoder`'s SIMD kernels, so large files take about 10–25% longer. All 40
-timed payloads match. The [report](bench/libflac-migration.json) has every
-wording change and the medians, and all [raw trials](bench/libflac-migration-trials.jsonl)
-are kept.
-
-The earlier swap from vendored claxon to `flac-decoder` is recorded in
-[bench/decoder-migration.json](bench/decoder-migration.json).
-
-## Status
-
-- **Ran end to end on testnet** on a Nitro host: real NSM attestation, registration with kagi, and `verify`.
-- **The `x86-64-v4` + GFNI image** measured, end to end through the parent bridge into a 4-vCPU c6i enclave: 0.11 s for 0.7 MB, 0.28 s for 17 MB, 0.8 s for 70 MB and 2.4–2.6 s for 259 MB. That's even with, or slightly ahead of, the same code built for generic `x86-64`; run-to-run spread on the host was up to 20%. Those timings predate the switch to libFLAC; the image has not been rebuilt or timed since.
-- **`make eif` vendors every dependency** from `Cargo.lock` before the Docker build, so the image builds offline. Only the vendor step needs network access. Rebuilding from the same commit reproduced the PCRs exactly. The libFLAC switch changes the image, so its PCRs change and the enclave must be registered again.
-- **Dependencies are pinned:**
-  - `audio` at `778d593`;
-  - `kagi` at `d2cf902`;
-  - `ori` at `367ed5f`;
-  - nautilus-rust at `46a9d27` (0.3.0, untagged);
-  - `walrus-blob-encoder` at `d0d6616`;
-  - `walrus-core` at `c377852`, as the dev-only reference for blob IDs;
-  - libFLAC 1.5.0, vendored from the release archive with SHA-256 `f2c1c765…c2b920`.
-
-This repository has not been audited.
+Move tests require the Sui CLI. Installing `ffmpeg` enables additional decoder cross-checks in the Rust tests.
 
 ## License
 
-[Functional Source License 1.1, ALv2 Future License](./LICENSE.md) (FSL-1.1-ALv2). The vendored libFLAC sources in `crates/libflac/flac-1.5.0` are
-BSD-3-Clause licensed, Copyright the Xiph.Org Foundation and contributors; see
-[COPYING.Xiph](crates/libflac/flac-1.5.0/COPYING.Xiph). That notice must accompany
-binary distributions, including enclave images.
+[Functional Source License 1.1, ALv2 Future License](LICENSE.md). Vendored libFLAC is [BSD-3-Clause licensed](crates/libflac/flac-1.5.0/COPYING.Xiph); its notice must accompany binary distributions.

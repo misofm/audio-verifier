@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use audio_verifier::AudioPayload;
+use audio_verifier::AudioVerificationPayload;
 use audio_verifier_enclave::{AUDIO_INTENT, AudioJson, response};
 use nautilus::{
     EnclaveIdentity, NautilusContext, intent_message, testing::FakeAttestor, verify_signed_response,
@@ -21,12 +21,12 @@ struct Vector {
     signature: String,
 }
 
-fn fixed_audio() -> AudioPayload {
+fn fixed_audio() -> AudioVerificationPayload {
     let mut blob_id = [0u8; 32];
     for (index, byte) in blob_id.iter_mut().enumerate() {
         *byte = index as u8;
     }
-    AudioPayload {
+    AudioVerificationPayload {
         format: "flac".to_owned(),
         channels: 2,
         bit_depth: 24,

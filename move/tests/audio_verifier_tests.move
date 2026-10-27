@@ -15,7 +15,7 @@ use audio_verifier::audio_verifier::{
     Self,
     AUDIO_VERIFIER,
     AudioVerifier,
-    AudioPayload,
+    AudioVerificationPayload,
     AudioVerifiedEvent,
 };
 
@@ -49,8 +49,8 @@ fun enclave(scenario: &mut Scenario): Enclave<AUDIO_VERIFIER> {
     enclave::new_for_testing<AUDIO_VERIFIER>(PK, POLICY_VERSION, scenario.ctx())
 }
 
-fun payload(): AudioPayload {
-    audio_verifier::new_audio_payload_for_testing(
+fun payload(): AudioVerificationPayload {
+    audio_verifier::new_audio_verification_payload_for_testing(
         b"flac".to_string(),
         CHANNELS,
         BIT_DEPTH,

@@ -33,7 +33,7 @@ def main():
             raise SystemExit(f"accept/reject changed: {name}")
         if old["accepted"]:
             if old["payload"] != new["payload"]:
-                raise SystemExit(f"AudioPayload changed: {name}")
+                raise SystemExit(f"AudioVerificationPayload changed: {name}")
         elif old["error"] != new["error"]:
             wording.append({"input": name, "before": old["error"], "after": new["error"]})
     print(json.dumps({

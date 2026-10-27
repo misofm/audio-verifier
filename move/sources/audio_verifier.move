@@ -22,7 +22,7 @@ public struct AUDIO_VERIFIER() has drop;
 
 public struct AudioVerifier() has drop;
 
-public struct AudioPayload has copy, drop {
+public struct AudioVerificationPayload has copy, drop {
     format: String,
     channels: u8,
     bit_depth: u8,
@@ -65,7 +65,7 @@ public fun verify(
     enclave.verify_signature(
         AUDIO_INTENT,
         timestamp_ms,
-        AudioPayload {
+        AudioVerificationPayload {
             format,
             channels,
             bit_depth,
@@ -103,7 +103,7 @@ public fun init_for_testing(ctx: &mut TxContext) {
 }
 
 #[test_only]
-public fun new_audio_payload_for_testing(
+public fun new_audio_verification_payload_for_testing(
     format: String,
     channels: u8,
     bit_depth: u8,
@@ -111,8 +111,8 @@ public fun new_audio_payload_for_testing(
     samples_per_channel: u64,
     pcm_digest: vector<u8>,
     blob_id: u256,
-): AudioPayload {
-    AudioPayload {
+): AudioVerificationPayload {
+    AudioVerificationPayload {
         format,
         channels,
         bit_depth,
