@@ -1,4 +1,4 @@
-# audio-verifier
+# Nautilus Audio Verifier
 
 Measures FLAC audio inside a Nautilus enclave on AWS Nitro and verifies the signed results on Sui. It checks the decoded audio, computes a BLAKE3 PCM digest and Walrus blob ID, and signs an `AudioVerificationPayload` containing the audio's format, channels, bit depth, sample rate, sample count, and digests.
 
