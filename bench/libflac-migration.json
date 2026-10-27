@@ -1,0 +1,216 @@
+{
+  "before": {
+    "commit": "ff2fb0a",
+    "decoder": "flac-decoder 13d0c4d, Config::canonical()"
+  },
+  "after": {
+    "decoder": "libFLAC 1.5.0 stream decoder, vendored from flac-1.5.0.tar.xz",
+    "archive_sha256": "f2c1c76592a82ffff8413ba3c4a1299b6c7ab06c734dee03fd88630485c2b920"
+  },
+  "inputs": {
+    "tests": "Every input passed to measure() by tests/measure.rs, captured with AUDIO_VERIFIER_MIGRATION_RESULTS from both revisions; the union includes the five inputs of the frame-number tests added with this change.",
+    "raw": "flac-decoder corpus/cellar (86) and corpus/matrix (85) unchanged, the 10 test fixtures and the 4 benchmark files.",
+    "stripped": "The same corpus files after metaflac --remove-all --dont-use-padding, so frame-level checks run; 165 of 171 could be stripped."
+  },
+  "comparison": {
+    "tests": {
+      "inputs": 81,
+      "accepted": 19,
+      "rejected": 62,
+      "payloads_and_verdicts_equal": true,
+      "error_wording_changes": [
+        {
+          "input": "165498bf7f922436ff322d7537bcf98dffb1494145c4f1abe6b8ec2389a499a8.flac",
+          "before": "FLAC decode failed: frame number 0, expected 1 at byte 4150, frame 1",
+          "after": "FLAC decode failed: frame 1 has frame number 0"
+        },
+        {
+          "input": "1a3eca24bfa639d0dfa5aaaaf47735fe444ebcc120d49ac6a337184214391b74.flac",
+          "before": "FLAC decode failed: blocking strategy changed at byte 4150, frame 1",
+          "after": "FLAC decode failed: frame 1 changes the blocking strategy"
+        },
+        {
+          "input": "b2e4320065acb463c87100ef58fce06090528a66a9b4dec7b37df009928ca54d.flac",
+          "before": "FLAC decode failed: truncated input at byte 100, frame 0, channel 0",
+          "after": "FLAC decode failed: libFLAC: lost sync in frame 0 at byte 42"
+        },
+        {
+          "input": "c48bb3ff0f01b1439127392df4555e2c913ee9b3299c848fd8359814d447904e.flac",
+          "before": "FLAC decode failed: truncated input at byte 5512, frame 1, channel 0",
+          "after": "FLAC decode failed: 1533 bytes after the last complete frame at byte 3979"
+        },
+        {
+          "input": "c71bbcd80f444c853602bfc956e3eca2b1828418399a078bfd15e33c44b4b5e4.flac",
+          "before": "FLAC decode failed: frame number 2, expected 1 at byte 4150, frame 1",
+          "after": "FLAC decode failed: libFLAC: missing frame in frame 1 at byte 4150"
+        },
+        {
+          "input": "d249c282fd69531223ac6c626aa4babc9d6ff395fc102c30b1dc15dac0c09069.flac",
+          "before": "FLAC decode failed: truncated input at byte 11024, frame 2",
+          "after": "FLAC decode failed: libFLAC: lost sync in frame 2 at byte 7937"
+        },
+        {
+          "input": "d8546d66c3fdbb5dedaf96f86d0499fd2f1dcec9261f189874b021d778d9ead4.flac",
+          "before": "FLAC decode failed: invalid coded number at byte 4154, frame 1",
+          "after": "FLAC decode failed: frame 1 at byte 4150: overlong coded number"
+        },
+        {
+          "input": "ed21b07fc0f0d3c32ef1fcd2eed678f572429d1ea2c9def53dd14fac65fe18fd.flac",
+          "before": "FLAC decode failed: sample number 0, expected 1024 at byte 4150, frame 1",
+          "after": "FLAC decode failed: frame 1 starts at sample 0, expected 1024"
+        },
+        {
+          "input": "f18ffd1025009d84a82a789729dfdff44beab506461b0e0cdb54ca89db711687.flac",
+          "before": "FLAC decode failed: no frame sync code at byte 11025, frame 3",
+          "after": "FLAC decode failed: libFLAC: lost sync in frame 3 at byte 11025"
+        }
+      ]
+    },
+    "raw": {
+      "inputs": 185,
+      "accepted": 13,
+      "rejected": 172,
+      "payloads_and_verdicts_equal": true,
+      "error_wording_changes": []
+    },
+    "stripped": {
+      "inputs": 165,
+      "accepted": 117,
+      "rejected": 48,
+      "payloads_and_verdicts_equal": true,
+      "error_wording_changes": [
+        {
+          "input": "cellar_subset_27_-_old_format_variable_blocksize_file_created_with_Flake_0.11.flac",
+          "before": "FLAC decode failed: frame number 4608, expected 1 at byte 9222, frame 1",
+          "after": "FLAC decode failed: frame 1 has frame number 4608"
+        }
+      ]
+    }
+  },
+  "method": {
+    "date_utc": "2026-10-27",
+    "host": "AMD EPYC 7313P, shared development host, SMT enabled",
+    "cpu_affinity": "2-5",
+    "rust": "1.94.1",
+    "rustflags": "-C target-cpu=x86-64",
+    "profile": "release, fat LTO, codegen-units=1",
+    "repetitions_per_revision_per_file": 5,
+    "order": "Alternate first revision on each pair; all 40 fresh-process trials retained, no warmups or retries.",
+    "timed": "First measure() call, including pool initialization; file I/O and JSON serialization excluded.",
+    "note": "Not the c7i.4xlarge used for the previous migration. A separate 12-pair rerun of s24_96k_240s.flac gave best 0.3004 s before and 0.3676 s after (+22.4%)."
+  },
+  "benchmarks": [
+    {
+      "file": "s16_44k_010s.flac",
+      "seconds": {
+        "flac_decoder": [
+          0.135389763,
+          0.135060146,
+          0.136123851,
+          0.134142923,
+          0.136633913
+        ],
+        "libflac": [
+          0.128810776,
+          0.129661805,
+          0.136750092,
+          0.137123443,
+          0.131468575
+        ]
+      },
+      "best": {
+        "flac_decoder": 0.134142923,
+        "libflac": 0.128810776
+      },
+      "median": {
+        "flac_decoder": 0.135389763,
+        "libflac": 0.131468575
+      },
+      "best_change_percent": -4.0
+    },
+    {
+      "file": "s16_44k_240s.flac",
+      "seconds": {
+        "flac_decoder": [
+          0.14931694,
+          0.151312588,
+          0.150816865,
+          0.154921926,
+          0.149271407
+        ],
+        "libflac": [
+          0.163743899,
+          0.171785259,
+          0.17216858,
+          0.206984242,
+          0.208200205
+        ]
+      },
+      "best": {
+        "flac_decoder": 0.149271407,
+        "libflac": 0.163743899
+      },
+      "median": {
+        "flac_decoder": 0.150816865,
+        "libflac": 0.17216858
+      },
+      "best_change_percent": 9.7
+    },
+    {
+      "file": "s24_96k_240s.flac",
+      "seconds": {
+        "flac_decoder": [
+          0.300438105,
+          0.402115188,
+          0.300989176,
+          0.30063818,
+          0.301155395
+        ],
+        "libflac": [
+          0.459593534,
+          0.455399557,
+          0.410770387,
+          0.452627698,
+          0.450301154
+        ]
+      },
+      "best": {
+        "flac_decoder": 0.300438105,
+        "libflac": 0.410770387
+      },
+      "median": {
+        "flac_decoder": 0.300989176,
+        "libflac": 0.452627698
+      },
+      "best_change_percent": 36.7
+    },
+    {
+      "file": "s24_192k_480s.flac",
+      "seconds": {
+        "flac_decoder": [
+          1.294806489,
+          1.261783709,
+          1.266621477,
+          1.27037592,
+          1.262604588
+        ],
+        "libflac": [
+          1.397635544,
+          1.501948676,
+          1.547233335,
+          1.5914358709999998,
+          1.519072682
+        ]
+      },
+      "best": {
+        "flac_decoder": 1.261783709,
+        "libflac": 1.397635544
+      },
+      "median": {
+        "flac_decoder": 1.266621477,
+        "libflac": 1.519072682
+      },
+      "best_change_percent": 10.8
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[package]
+name = "libflac"
+description = "Safe callback interface to libFLAC 1.5.0's stream decoder, built from vendored sources"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "BSD-3-Clause"
+publish.workspace = true
+repository.workspace = true
+links = "FLAC"
+
+[dependencies]
+thiserror.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+# The workspace forbids unsafe code; this crate is the one FFI boundary, so it
+# restates the workspace lints without that rule.
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"

@@ -2,9 +2,9 @@ mod common;
 
 use audio_verifier::{AudioPayload, Error, blob_id_base64, compute_blob_id};
 use common::{
-    FrameHeader, Rate, Synth, block_sizes, committed_blob_id, decoded_samples, ffmpeg,
+    FrameEdit, FrameHeader, Rate, Synth, block_sizes, committed_blob_id, decoded_samples, ffmpeg,
     ffmpeg_raw_pcm, fixture, fixture_path, frame_sizes, pcm_md5, scratch_file, set_block_sizes,
-    set_frame_sizes, set_md5, set_streaminfo, walrus_cli, walrus_cli_blob_id,
+    set_frame_sizes, set_md5, set_streaminfo, utf8_number, walrus_cli, walrus_cli_blob_id,
 };
 
 // Optional migration evidence from the same inputs and assertions as this suite.
@@ -734,4 +734,65 @@ fn rejects_wrong_max_frame_size() {
             );
         }
     }
+}
+
+fn decode_message(bytes: &[u8]) -> String {
+    match rejects(bytes) {
+        Error::Decode(message) => message,
+        other => panic!("expected a decode error, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_wrong_frame_number() {
+    // libFLAC itself reports a forward gap as a missing frame.
+    let bytes = Synth::new(2, 16, 48_000)
+        .with_frame_edit(1, FrameEdit::CodedNumber(utf8_number(2)))
+        .build();
+    assert_eq!(
+        decode_message(&bytes),
+        "libFLAC: missing frame in frame 1 at byte 4150"
+    );
+
+    // A repeated number is no gap to libFLAC; the frame header check finds it.
+    let bytes = Synth::new(2, 16, 48_000)
+        .with_frame_edit(1, FrameEdit::CodedNumber(utf8_number(0)))
+        .build();
+    assert_eq!(decode_message(&bytes), "frame 1 has frame number 0");
+}
+
+#[test]
+fn rejects_wrong_sample_number() {
+    let bytes = Synth::new(2, 16, 48_000)
+        .with_variable_block_sizes(&VARIABLE_BLOCKS)
+        .with_frame_edit(1, FrameEdit::CodedNumber(utf8_number(0)))
+        .build();
+    assert_eq!(
+        decode_message(&bytes),
+        "frame 1 starts at sample 0, expected 1024"
+    );
+}
+
+#[test]
+fn rejects_overlong_coded_number() {
+    let bytes = Synth::new(2, 16, 48_000)
+        .with_frame_edit(1, FrameEdit::CodedNumber(vec![0xc0, 0x81]))
+        .build();
+    assert_eq!(
+        decode_message(&bytes),
+        "frame 1 at byte 4150: overlong coded number"
+    );
+}
+
+#[test]
+fn rejects_blocking_strategy_change() {
+    let bytes = Synth::new(2, 16, 48_000)
+        .with_variable_block_sizes(&VARIABLE_BLOCKS)
+        .with_frame_edit(1, FrameEdit::FlipBlocking)
+        .with_frame_edit(1, FrameEdit::CodedNumber(utf8_number(1)))
+        .build();
+    assert_eq!(
+        decode_message(&bytes),
+        "frame 1 changes the blocking strategy"
+    );
 }

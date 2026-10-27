@@ -10,7 +10,7 @@ repository.workspace = true
 
 [dependencies]
 blake3.workspace = true
-flac-decoder.workspace = true
+libflac.workspace = true
 md-5.workspace = true
 rayon.workspace = true
 serde.workspace = true

@@ -1,5 +1,6 @@
 mod decode;
 mod error;
+mod frame_header;
 mod self_test;
 mod streaminfo;
 mod walrus;

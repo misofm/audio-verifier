@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/audio-verifier", "crates/audio-verifier-enclave"]
+members = ["crates/libflac", "crates/audio-verifier", "crates/audio-verifier-enclave"]
 resolver = "3"
 
 [workspace.package]
@@ -15,10 +15,11 @@ anyhow = "1.0.102"
 axum = "0.8.9"
 bcs = "0.1.6"
 blake3 = "1.8.2"
-flac-decoder = { git = "https://github.com/misofm/flac-decoder", rev = "13d0c4dcd4b8f423eaebbed3670e6a0913a4966b" }
+cc = "1.2.62"
 hex = "0.4.3"
 futures-util = "0.3.31"
 http-body-util = "0.1.3"
+libflac = { path = "crates/libflac" }
 md-5 = "0.10.6"
 nautilus = { git = "https://github.com/unconfirmedlabs/nautilus-rust", rev = "46a9d27777bc749f76eb5ae1360eb77d2361a94d" }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -45,4 +46,7 @@ lto = "fat"
 strip = "symbols"
 
 [profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.libflac]
 opt-level = 3

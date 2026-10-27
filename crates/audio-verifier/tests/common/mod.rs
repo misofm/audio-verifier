@@ -139,12 +139,27 @@ pub fn set_md5(bytes: &mut [u8], md5: [u8; 16]) {
 }
 
 pub fn decoded_samples(bytes: &[u8]) -> Vec<i32> {
-    let mut decoder = flac_decoder::Decoder::new(bytes).expect("decoder");
-    let mut samples = Vec::new();
-    while let Some(frame) = decoder.next_frame().expect("frame") {
-        frame.write_interleaved_i32(&mut samples);
+    struct Interleave(Vec<i32>);
+
+    impl libflac::Handler for Interleave {
+        type Error = std::convert::Infallible;
+
+        fn stream_info(&mut self, _info: &libflac::StreamInfo) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn frame(&mut self, frame: &libflac::Frame<'_>) -> Result<(), Self::Error> {
+            for i in 0..frame.block_size as usize {
+                self.0
+                    .extend(frame.samples.iter().map(|channel| channel[i]));
+            }
+            Ok(())
+        }
     }
-    samples
+
+    let mut samples = Interleave(Vec::new());
+    libflac::decode(bytes, &mut samples).expect("decode");
+    samples.0
 }
 
 pub fn pcm_md5(samples: &[i32], bytes_per_sample: usize) -> [u8; 16] {
@@ -206,6 +221,16 @@ pub struct Synth {
     pub variable_block_sizes: Vec<usize>,
     pub frame_header: FrameHeader,
     pub override_from_block: usize,
+    pub frame_edits: Vec<(usize, FrameEdit)>,
+}
+
+/// A deliberate fault in one frame's header; CRCs are computed after it.
+#[derive(Debug, Clone)]
+pub enum FrameEdit {
+    /// Replaces the coded frame or sample number with these bytes.
+    CodedNumber(Vec<u8>),
+    /// Flips the blocking strategy bit, keeping the coded number.
+    FlipBlocking,
 }
 
 impl Synth {
@@ -223,7 +248,13 @@ impl Synth {
                 rate: Rate::standard(sample_rate_hz),
             },
             override_from_block: 0,
+            frame_edits: Vec::new(),
         }
+    }
+
+    pub fn with_frame_edit(mut self, frame: usize, edit: FrameEdit) -> Self {
+        self.frame_edits.push((frame, edit));
+        self
     }
 
     pub fn with_header(mut self, frame_header: FrameHeader) -> Self {
@@ -275,7 +306,15 @@ impl Synth {
                 }
             }
             let number = if variable { offset } else { index };
-            let encoded = frame(variable, number as u32, header, &channels);
+            let mut coded = utf8_number(number as u32);
+            let mut frame_variable = variable;
+            for (_, edit) in self.frame_edits.iter().filter(|(at, _)| *at == index) {
+                match edit {
+                    FrameEdit::CodedNumber(bytes) => coded.clone_from(bytes),
+                    FrameEdit::FlipBlocking => frame_variable = !frame_variable,
+                }
+            }
+            let encoded = frame(frame_variable, &coded, header, &channels);
             durations.push(len);
             frame_sizes.push(encoded.len() as u32);
             frames.extend(encoded);
@@ -333,13 +372,18 @@ fn bps_code(bit_depth: u8) -> u8 {
     }
 }
 
-fn frame(variable: bool, number: u32, header: FrameHeader, channels: &[Vec<i32>]) -> Vec<u8> {
+fn frame(
+    variable: bool,
+    coded_number: &[u8],
+    header: FrameHeader,
+    channels: &[Vec<i32>],
+) -> Vec<u8> {
     let block_size = channels[0].len();
     let (rate_code, rate_extra) = header.rate.code_and_extra();
     let sync = if variable { 0xf9 } else { 0xf8 };
     let mut out = vec![0xff, sync, (0b0111 << 4) | rate_code];
     out.push(((header.channels - 1) << 4) | (bps_code(header.bit_depth) << 1));
-    out.extend(utf8_number(number));
+    out.extend(coded_number);
     out.extend(((block_size - 1) as u16).to_be_bytes());
     out.extend(rate_extra);
     out.push(crc8(&out));
@@ -357,7 +401,7 @@ fn frame(variable: bool, number: u32, header: FrameHeader, channels: &[Vec<i32>]
     out
 }
 
-fn utf8_number(number: u32) -> Vec<u8> {
+pub fn utf8_number(number: u32) -> Vec<u8> {
     match number {
         0..0x80 => vec![number as u8],
         0x80..0x800 => vec![0xc0 | (number >> 6) as u8, 0x80 | (number & 0x3f) as u8],
