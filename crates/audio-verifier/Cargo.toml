@@ -1,0 +1,27 @@
+[package]
+name = "audio-verifier"
+description = "Measures canonical FLAC audio into the Move audio::audio::Audio layout"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+blake3.workspace = true
+flac-decoder.workspace = true
+md-5.workspace = true
+rayon.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+walrus-blob-encoder.workspace = true
+
+[dev-dependencies]
+bcs.workspace = true
+hex.workspace = true
+serde_json.workspace = true
+walrus-core.workspace = true
+
+[lints]
+workspace = true

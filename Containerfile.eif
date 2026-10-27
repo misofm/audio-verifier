@@ -1,0 +1,116 @@
+# Reproducible EIF builder for the audio-verifier enclave, adapted from
+# unconfirmedlabs/nautilus-rust 46a9d27 (Apache-2.0). It follows the StageX
+# pattern: pinned source-bootstrapped build inputs, normalized initramfs
+# timestamps, and explicit PCR output.
+#
+# user-eif_build, user-gen_initramfs, user-linux-nitro and user-nit stay on the
+# sx2025.08.0 pins that Mysten's template uses: with the sx2026.03.0 builds of
+# those four, the enclave never boots on Nitro (no console, no heartbeat).
+
+FROM stagex/core-binutils@sha256:9fedf2687ad85efab8da71417bfbe78659db5295ee4e288df3a04315e3b687ac AS core-binutils
+FROM stagex/core-ca-certificates@sha256:4d901fb99baee5f461ede66e37edf2505d9d367222feded99e80892b1940f710 AS core-ca-certificates
+FROM stagex/core-gcc@sha256:0e382ec440f4e858d8156088196f588fa935b689bfde4130d7cc6bed74c6fc10 AS core-gcc
+FROM stagex/core-git@sha256:e87793fb81c2d9f24784a5674a2c0160fae0d823b17d7fafb5e69846a71730e5 AS core-git
+FROM stagex/core-zlib@sha256:130afab57ac8e9a9eb1e0c6e2c91758a67f731634d3cdb45ae04ea0534cc3930 AS core-zlib
+FROM stagex/core-libffi@sha256:c1efa10f13e4a416353b958d82b4e268aa04c723c66cb6a17006df0f4c4134aa AS core-libffi
+FROM stagex/core-llvm@sha256:828af54c098f1b302bfe73b02e71d5fcf363fe9ff31ea0e51ffb43689d77c6f3 AS core-llvm
+FROM stagex/core-libcxx@sha256:733ddf3bf6a47ba39578bec31d30804db134fa72482e8dbf4fcf288788d8a5b4 AS core-libcxx
+FROM stagex/core-libcxxabi@sha256:88e66348a0eb2b1c0a321aaac138aef4ccc4bbd13a16ffd1de0231d5506f66b3 AS core-libcxxabi
+FROM stagex/core-openssl@sha256:decacae13674bebbeaef3ce79c5d1159ae8495f272f8fa7e5db660c84ab37d1d AS core-openssl
+FROM stagex/core-rust@sha256:afd1cad50f1beff37d41d756e4ebf606b7a100119e96d3c1b140fa6b27386034 AS core-rust
+FROM stagex/core-musl@sha256:816a6e097544c23386c95c8614e358ace7c5026c3f53b7b9353b84cbb4ed0096 AS core-musl
+FROM stagex/core-libunwind@sha256:c76fcc66148b19230247b7cdba06040dbe2f47aa19d7a4be4d430db15d47e4b8 AS core-libunwind
+FROM stagex/core-pkgconf@sha256:437751215006901bd9a31720de95fa10e294b585abbfe78436310cec481884e4 AS core-pkgconf
+FROM stagex/core-busybox@sha256:d608daa946e4799cf28b105aba461db00187657bd55ea7c2935ff11dac237e27 AS core-busybox
+FROM stagex/core-libzstd@sha256:dd234de20cd651715ffc67ced1bb06cc3ac3011d881055beda335869d7d4210f AS core-libzstd
+FROM stagex/user-eif_build@sha256:935032172a23772ea1a35c6334aa98aa7b0c46f9e34a040347c7b2a73496ef8a AS user-eif_build
+FROM stagex/user-gen_initramfs@sha256:a87e9a3fa8468d2e08b5abb0a6da4c7a11df22273e2c526cb22e6b131151def8 AS user-gen_initramfs
+FROM stagex/user-linux-nitro@sha256:aa1006d91a7265b33b86160031daad2fdf54ec2663ed5ccbd312567cc9beff2c AS user-linux-nitro
+FROM stagex/user-cpio@sha256:d0c7abf1f7e8e157c1d86d7c02b5095a65aeb71abf1e4e8886dc57b4e70a71a7 AS user-cpio
+FROM stagex/user-nit@sha256:60b6eef4534ea6ea78d9f29e4c7feb27407b615424f20ad8943d807191688be7 AS user-nit
+
+FROM scratch AS base
+COPY --from=core-busybox . /
+COPY --from=core-musl . /
+COPY --from=core-libunwind . /
+COPY --from=core-openssl . /
+COPY --from=core-zlib . /
+COPY --from=core-ca-certificates . /
+COPY --from=core-libzstd . /
+COPY --from=core-binutils . /
+COPY --from=core-pkgconf . /
+COPY --from=core-git . /
+COPY --from=core-rust . /
+COPY --from=user-gen_initramfs . /
+COPY --from=user-eif_build . /
+COPY --from=core-llvm . /
+COPY --from=core-libcxx . /
+COPY --from=core-libcxxabi . /
+COPY --from=core-libffi . /
+COPY --from=core-gcc . /
+COPY --from=user-cpio . /
+COPY --from=user-linux-nitro /bzImage .
+COPY --from=user-linux-nitro /linux.config .
+
+FROM base AS build
+WORKDIR /workspace
+COPY . .
+RUN mkdir -p .cargo && cp vendor/config.toml .cargo/config.toml
+
+ENV SOURCE_DATE_EPOCH=0
+ENV TARGET=x86_64-unknown-linux-musl
+ENV RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=static -C target-cpu=x86-64-v4 -C target-feature=+gfni"
+ARG ENCLAVE_PACKAGE=audio-verifier-enclave
+ARG ENCLAVE_BIN=audio-verifier-enclave
+
+# StageX Rust 1.94.0 links build scripts and final musl binaries through
+# libunwind names that core-libunwind does not ship: it has only
+# libunwind.so.1, and no static archive.
+RUN ln -sf /usr/lib/gcc/x86_64-linux-musl/15.2.0/libgcc_eh.a /usr/lib/libunwind.a \
+	&& ln -sf libunwind.so.1 /usr/lib/libunwind.so \
+	&& ln -sf libunwind.so.1 /usr/lib/libunwind.so.8 \
+	&& ln -sf libunwind.so.1 /lib64/libunwind.so \
+	&& ln -sf libunwind.so.1 /lib64/libunwind.so.8
+RUN sh scripts/assert-no-test-utils.sh "$ENCLAVE_PACKAGE" "$TARGET"
+RUN cargo build --locked --release --target "$TARGET" -p "$ENCLAVE_PACKAGE"
+
+WORKDIR /build_cpio
+ENV KBUILD_BUILD_TIMESTAMP=1
+RUN mkdir initramfs
+COPY --from=core-busybox . initramfs
+COPY --from=core-musl . initramfs
+COPY --from=user-nit /bin/init initramfs/init
+RUN cp "/workspace/target/${TARGET}/release/${ENCLAVE_BIN}" initramfs/nautilus-app
+RUN cp /workspace/eif/run.sh initramfs/run.sh
+RUN chmod +x initramfs/nautilus-app initramfs/run.sh
+
+RUN <<-EOF
+	set -eux
+	cd initramfs
+	find . -exec touch -hcd "@0" "{}" + -print0 \
+	| sort -z \
+	| cpio \
+		--null \
+		--create \
+		--verbose \
+		--reproducible \
+		--format=newc \
+	| gzip --best --no-name \
+	> /build_cpio/rootfs.cpio
+EOF
+
+# initrd= is informational on x86, where the kernel takes the ramdisk from
+# the boot parameters; it is kept accurate rather than copied from a template.
+WORKDIR /build_eif
+RUN eif_build \
+	--kernel /bzImage \
+	--kernel_config /linux.config \
+	--ramdisk /build_cpio/rootfs.cpio \
+	--pcrs_output /nitro.pcrs \
+	--output /nitro.eif \
+	--cmdline "reboot=k initrd=0x2000000,$(wc -c < /build_cpio/rootfs.cpio) root=/dev/ram0 panic=1 pci=off nomodules console=ttyS0 i8042.noaux i8042.nomux i8042.nopnp i8042.dumbkbd nit.target=/run.sh"
+
+FROM scratch AS package
+COPY --from=build /nitro.eif .
+COPY --from=build /nitro.pcrs .
+COPY --from=build /build_cpio/rootfs.cpio .
