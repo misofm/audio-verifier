@@ -22,6 +22,7 @@ use audio_verifier::audio_verifier::{
 // === Constants ===
 
 const PUBLISHER: address = @0xA;
+
 const PK: vector<u8> = x"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c";
 const SIGNED_AT_MS: u64 = 1_750_000_000_000;
 const POLICY_VERSION: u64 = 1;
