@@ -87,7 +87,6 @@ fun verify_with(
 fun init_shares_an_unset_policy_and_sends_its_cap() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     audio_verifier::init_for_testing(scenario.ctx());
-
     scenario.next_tx(PUBLISHER);
     let policy = scenario.take_shared<EnclavePolicy<AUDIO_VERIFIER>>();
     assert!(policy.pcr0().is_empty());
@@ -131,7 +130,6 @@ fun verify_emits_the_verification_and_the_audio_facts() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let enclave = enclave(&mut scenario);
     verify_with(&enclave, SAMPLES_PER_CHANNEL, SIGNED_AT_MS, SIGNATURE);
-
     let events = event::events_by_type<AudioVerifiedEvent>();
     assert_eq!(events.length(), 1);
     let (enclave_id, policy_version, verified_at_ms, pcm_digest, blob_id) =
