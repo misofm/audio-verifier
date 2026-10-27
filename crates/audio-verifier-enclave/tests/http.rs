@@ -212,3 +212,27 @@ fn zero_body_limit_is_a_config_error() {
         Some(ConfigError::Zero("max_body_bytes"))
     );
 }
+
+#[tokio::test]
+async fn excessive_decoded_work_is_rejected_unsigned() {
+    let mut bytes = fixture();
+    // Preserve format fields and replace the 36-bit sample count with its maximum.
+    bytes[21] |= 0x0f;
+    bytes[22..26].fill(0xff);
+    let response = app(context(), server_config(DEFAULT_MAX_BODY_BYTES))
+        .expect("config")
+        .oneshot(post(Body::from(bytes)))
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let value = json(response).await;
+    assert!(value["message"].as_str().unwrap().contains("decoded PCM"));
+    assert!(value.get("signature").is_none());
+}
+
+#[test]
+fn ambiguous_or_zero_body_limits_are_rejected() {
+    assert!(max_body_bytes(&[], Some("0".into())).is_err());
+    let args = ["--max-body-bytes", "1024", "--max-body-bytes", "2048"].map(String::from);
+    assert!(max_body_bytes(&args, None).is_err());
+}

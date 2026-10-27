@@ -148,6 +148,13 @@ impl<'a> Canonical<'a> {
                 found: frame.sample_rate,
             });
         }
+        let decoded = self.samples + u64::from(frame.block_size);
+        if decoded > info.total_samples {
+            return Err(Error::SampleCount {
+                expected: info.total_samples,
+                decoded,
+            });
+        }
         self.check_previous_block()?;
         if frame.block_size > u32::from(info.max_block_size) {
             return Err(Error::FrameBlockSizeAboveMax {

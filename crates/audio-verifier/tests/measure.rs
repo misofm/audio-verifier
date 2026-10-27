@@ -796,3 +796,16 @@ fn rejects_blocking_strategy_change() {
         "frame 1 changes the blocking strategy"
     );
 }
+
+#[test]
+fn rejects_sample_overrun_on_the_first_frame() {
+    let mut bytes = fixture("s16_stereo_44100.flac");
+    set_streaminfo(&mut bytes, 44_100, 2, 16, 1);
+    match rejects(&bytes) {
+        Error::SampleCount { expected, decoded } => {
+            assert_eq!(expected, 1);
+            assert!(decoded > 1 && decoded < 11_025);
+        }
+        error => panic!("unexpected error: {error:?}"),
+    }
+}

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use audio_verifier::{AudioPayload, blob_id_base64, measure, u256_le_decimal};
+use audio_verifier::{AudioPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal};
 use axum::{Router, body::Bytes};
 use nautilus::{ConfigError, Intent, NautilusContext, NautilusError, ServerConfig, SignedResponse};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,10 @@ pub const AUDIO_INTENT: Intent = Intent(0);
 
 /// Default `/process_data` body limit.
 pub const DEFAULT_MAX_BODY_BYTES: usize = 256 * 1024 * 1024;
+
+/// Maximum decoded PCM work per request, including all channels (4 GiB).
+/// Compressed uploads can otherwise expand to terabytes of hashing work.
+pub const MAX_DECODED_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 /// Deadline for one upload and measurement.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
@@ -98,6 +102,18 @@ pub fn response(
 
 /// Measures `bytes` and signs the result.
 pub fn process(bytes: &[u8], ctx: &NautilusContext) -> Result<ProcessDataResponse, NautilusError> {
+    let info = StreamInfo::parse_canonical(bytes)
+        .and_then(|info| info.validate().map(|()| info))
+        .map_err(|error| NautilusError::application(error.to_string()))?;
+    let decoded_bytes = info
+        .total_samples
+        .checked_mul(u64::from(info.channels))
+        .and_then(|samples| samples.checked_mul(info.bytes_per_sample() as u64));
+    if decoded_bytes.is_none_or(|size| size > MAX_DECODED_BYTES) {
+        return Err(NautilusError::application(
+            "decoded PCM exceeds the 4 GiB service limit",
+        ));
+    }
     let audio = measure(bytes).map_err(|error| NautilusError::application(error.to_string()))?;
     Ok(response(ctx, ctx.sign_intent(AUDIO_INTENT, audio)?))
 }
@@ -133,13 +149,21 @@ pub fn max_body_bytes(args: &[String], env: Option<String>) -> anyhow::Result<us
                 let value = iter
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("--max-body-bytes needs a value"))?;
+                anyhow::ensure!(
+                    flag.is_none(),
+                    "--max-body-bytes may only be specified once"
+                );
                 flag = Some(value.clone());
             }
             other => anyhow::bail!("unknown argument {other}"),
         }
     }
     match flag.or(env) {
-        Some(value) => Ok(value.trim().parse()?),
+        Some(value) => {
+            let limit = value.trim().parse::<usize>()?;
+            anyhow::ensure!(limit > 0, "max body bytes must be greater than zero");
+            Ok(limit)
+        }
         None => Ok(DEFAULT_MAX_BODY_BYTES),
     }
 }
