@@ -20,7 +20,7 @@ const AUDIO_INTENT: u8 = 0;
 
 public struct AUDIO_VERIFIER() has drop;
 
-public struct Verifier() has drop;
+public struct AudioVerifier() has drop;
 
 public struct AudioPayload has copy, drop {
     format: String,
@@ -61,7 +61,7 @@ public fun verify(
     blob_id: u256,
     timestamp_ms: u64,
     signature: vector<u8>,
-): Audio<Verifier> {
+): Audio<AudioVerifier> {
     enclave.verify_signature(
         AUDIO_INTENT,
         timestamp_ms,
@@ -84,7 +84,7 @@ public fun verify(
         blob_id,
     });
     audio::new(
-        Verifier(),
+        AudioVerifier(),
         format,
         channels,
         bit_depth,

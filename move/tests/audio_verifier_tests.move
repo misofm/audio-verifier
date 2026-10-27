@@ -14,7 +14,7 @@ use kagi::enclave_policy::{EnclavePolicy, EnclavePolicyCap};
 use audio_verifier::audio_verifier::{
     Self,
     AUDIO_VERIFIER,
-    Verifier,
+    AudioVerifier,
     AudioPayload,
     AudioVerifiedEvent,
 };
@@ -66,7 +66,7 @@ fun verify_with(
     samples_per_channel: u64,
     timestamp_ms: u64,
     signature: vector<u8>,
-): Audio<Verifier> {
+): Audio<AudioVerifier> {
     audio_verifier::verify(
         enclave,
         b"flac".to_string(),
@@ -141,7 +141,7 @@ fun verify_emits_the_verification_and_the_audio_facts() {
     assert_eq!(verified_at_ms, SIGNED_AT_MS);
     assert_eq!(pcm_digest, PCM_DIGEST);
     assert_eq!(blob_id, BLOB_ID);
-    assert_eq!(event::events_by_type<AudioCreatedEvent<Verifier>>().length(), 1);
+    assert_eq!(event::events_by_type<AudioCreatedEvent<AudioVerifier>>().length(), 1);
     assert_eq!(event::num_events(), 2);
     enclave.destroy_for_testing();
     scenario.end();

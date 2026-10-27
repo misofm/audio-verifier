@@ -2,7 +2,7 @@
 
 Audio whose technical facts were measured inside a [Nautilus](https://github.com/MystenLabs/nautilus) enclave (AWS Nitro) and checked on Sui.
 
-[`misofm/audio`](https://github.com/misofm/audio) defines `Audio<Verifier>`, lossless audio facts vouched for by a verifier witness type. This repository is one verifier: `audio_verifier::verify` returns **`Audio<audio_verifier::audio_verifier::Verifier>`**, and only a signature from a registered `Enclave<AUDIO_VERIFIER>` can produce one. Consumers that trust this enclave pin that type.
+[`misofm/audio`](https://github.com/misofm/audio) defines `Audio<AudioVerifier>`, lossless audio facts vouched for by a verifier witness type. This repository is one verifier: `audio_verifier::verify` returns **`Audio<audio_verifier::audio_verifier::AudioVerifier>`**, and only a signature from a registered `Enclave<AUDIO_VERIFIER>` can produce one. Consumers that trust this enclave pin that type.
 
 ## How it works
 
@@ -12,9 +12,9 @@ client ──FLAC bytes──▶ enclave (audio-verifier-enclave)
                                   Walrus blob ID recomputed from the bytes
                          sign:    bcs(IntentMessage { intent: 0, timestamp_ms, payload: AudioPayload })
 client ◀──JSON + signature──
-client ──PTB──▶ audio_verifier::verify(enclave, facts…, timestamp_ms, signature) ──▶ Audio<Verifier>
+client ──PTB──▶ audio_verifier::verify(enclave, facts…, timestamp_ms, signature) ──▶ Audio<AudioVerifier>
                  ├─ kagi::enclave::verify_signature
-                 └─ audio::new(Verifier(), facts…, unencrypted WalrusBlob)
+                 └─ audio::new(AudioVerifier(), facts…, unencrypted WalrusBlob)
 ```
 
 - **The enclave needs no outbound network.** The client uploads the bytes, and the enclave recomputes the Walrus blob ID itself with [`walrus-blob-encoder`](https://github.com/unconfirmedlabs/walrus-blob-encoder), using 1,000 shards as mainnet does. Its blob IDs are byte-identical to `walrus-core` `c377852` and the `walrus` CLI 1.58.1. It never trusts an aggregator.
@@ -27,7 +27,7 @@ client ──PTB──▶ audio_verifier::verify(enclave, facts…, timestamp_ms
     - block sizes must satisfy `16 <= min_block_size <= max_block_size`. Every frame but the last must have `min_block_size <= samples <= max_block_size`, and the last frame `samples <= max_block_size`. With two or more frames, `min_block_size` must equal the smallest frame before the last, and `max_block_size` the largest frame. A single frame may be shorter than both, because libFLAC and ffmpeg write the configured block size;
     - frame sizes, in bytes from the frame header through the CRC-16, may be 0 for unknown. Otherwise `min_frame_size` must equal the smallest frame and `max_frame_size` the largest. ffmpeg and libFLAC write exact values.
 - **`pcm_digest`** follows the `audio` spec: BLAKE3 over the decoded PCM, interleaved by sample frame, each sample a signed little-endian two's-complement integer of `ceil(bit_depth / 8)` bytes, sign-extended. For the bit depths accepted here, that's the same stream FLAC's MD5 covers.
-- **The signed payload is `AudioPayload`:** `format`, `channels`, `bit_depth`, `sample_rate_hz`, `samples_per_channel`, `pcm_digest`, `blob_id`, in that order. On-chain, kagi checks the signature against a registered `Enclave<AUDIO_VERIFIER>`, and `audio::new` validates the fields and emits `AudioCreatedEvent<Verifier>`.
+- **The signed payload is `AudioPayload`:** `format`, `channels`, `bit_depth`, `sample_rate_hz`, `samples_per_channel`, `pcm_digest`, `blob_id`, in that order. On-chain, kagi checks the signature against a registered `Enclave<AUDIO_VERIFIER>`, and `audio::new` validates the fields and emits `AudioCreatedEvent<AudioVerifier>`.
 
 ## Layout
 
@@ -124,7 +124,7 @@ guard pass. The consumer repository currently has no CI workflow.
 - **The `x86-64-v4` + GFNI image** measured, end to end through the parent bridge into a 4-vCPU c6i enclave: 0.11 s for 0.7 MB, 0.28 s for 17 MB, 0.8 s for 70 MB and 2.4–2.6 s for 259 MB. That's even with, or slightly ahead of, the same code built for generic `x86-64`; run-to-run spread on the host was up to 20%.
 - **`make eif` vendors every dependency** from `Cargo.lock` before the Docker build, so the image builds offline. Only the vendor step needs network access. Rebuilding from the same commit reproduced the PCRs exactly.
 - **Dependencies are pinned:**
-  - `audio` at `f099d5e`;
+  - `audio` at `778d593`;
   - `kagi` at `d2cf902`;
   - `ori` at `367ed5f`;
   - nautilus-rust at `46a9d27` (0.3.0, untagged);
