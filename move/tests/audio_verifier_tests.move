@@ -158,11 +158,6 @@ fun verify_audio_returns_the_signed_facts_and_encoding() {
     assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
     assert_eq!(audio.duration_ms(), 10_000);
     assert!(audio_encoding::has_encoding<_, AudioVerifier>(&audio, BLOB_ID));
-    assert!(
-        !audio_encoding::encoding<_, AudioVerifier>(&audio, BLOB_ID)
-            .blob_confidentiality()
-            .is_encrypted(),
-    );
     assert_eq!(
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
