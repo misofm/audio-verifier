@@ -82,9 +82,9 @@ public fun verify_audio(
     let mut audio = audio::new(
         registry,
         AudioVerifier(),
-        sample_rate_hz,
         channels,
         bit_depth,
+        sample_rate_hz,
         samples_per_channel,
         pcm_digest,
     );
@@ -106,9 +106,9 @@ public fun verify_encoding(
     signature: vector<u8>,
 ) {
     assert!(
-        audio.sample_rate_hz() == sample_rate_hz &&
         audio.channels() == channels &&
         audio.bit_depth() == bit_depth &&
+        audio.sample_rate_hz() == sample_rate_hz &&
         audio.samples_per_channel() == samples_per_channel &&
         audio.pcm_digest() == &pcm_digest,
         EWrongAudio,

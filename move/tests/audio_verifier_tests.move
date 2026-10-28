@@ -81,9 +81,9 @@ fun verify_with(
 fun verify_encoding_with(
     audio: &mut Audio<AudioVerifier>,
     enclave: &Enclave<AUDIO_VERIFIER>,
-    sample_rate_hz: u32,
     channels: u8,
     bit_depth: u8,
+    sample_rate_hz: u32,
     samples_per_channel: u64,
     pcm_digest: vector<u8>,
 ) {
@@ -148,9 +148,9 @@ fun payload_bcs_matches_the_signed_vector() {
 fun verify_audio_returns_the_signed_facts_and_encoding() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let (registry, enclave, audio) = verified(&mut scenario);
-    assert_eq!(audio.sample_rate_hz(), SAMPLE_RATE_HZ);
     assert_eq!(audio.channels(), CHANNELS);
     assert_eq!(audio.bit_depth(), BIT_DEPTH);
+    assert_eq!(audio.sample_rate_hz(), SAMPLE_RATE_HZ);
     assert_eq!(audio.samples_per_channel(), SAMPLES_PER_CHANNEL);
     assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
     assert_eq!(audio.duration_ms(), 10_000);
@@ -160,9 +160,9 @@ fun verify_audio_returns_the_signed_facts_and_encoding() {
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
             object::id(&registry),
-            SAMPLE_RATE_HZ,
             CHANNELS,
             BIT_DEPTH,
+            SAMPLE_RATE_HZ,
             SAMPLES_PER_CHANNEL,
             PCM_DIGEST,
         ),
@@ -211,9 +211,9 @@ fun verify_encoding_on_existing_audio_records_the_verification() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ,
         CHANNELS,
         BIT_DEPTH,
+        SAMPLE_RATE_HZ,
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
@@ -231,9 +231,9 @@ fun verify_encoding_rejects_another_sample_rate() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ + 1,
         CHANNELS,
         BIT_DEPTH,
+        SAMPLE_RATE_HZ + 1,
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
@@ -247,9 +247,9 @@ fun verify_encoding_rejects_another_channels() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ,
         CHANNELS + 1,
         BIT_DEPTH,
+        SAMPLE_RATE_HZ,
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
@@ -263,9 +263,9 @@ fun verify_encoding_rejects_another_bit_depth() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ,
         CHANNELS,
         BIT_DEPTH + 1,
+        SAMPLE_RATE_HZ,
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
@@ -279,9 +279,9 @@ fun verify_encoding_rejects_another_samples_per_channel() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ,
         CHANNELS,
         BIT_DEPTH,
+        SAMPLE_RATE_HZ,
         SAMPLES_PER_CHANNEL + 1,
         PCM_DIGEST,
     );
@@ -295,9 +295,9 @@ fun verify_encoding_rejects_another_pcm_digest() {
     verify_encoding_with(
         &mut audio,
         &enclave,
-        SAMPLE_RATE_HZ,
         CHANNELS,
         BIT_DEPTH,
+        SAMPLE_RATE_HZ,
         SAMPLES_PER_CHANNEL,
         x"2222222222222222222222222222222222222222222222222222222222222222",
     );
