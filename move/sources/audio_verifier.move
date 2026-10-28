@@ -3,12 +3,10 @@
 
 module audio_verifier::audio_verifier;
 
-use audio::audio::{Self, Audio, AudioRegistry};
+use audio::{audio::{Self, Audio, AudioRegistry}, audio_encoding};
 use kagi::{enclave::Enclave, enclave_policy};
 use std::string::String;
 use sui::event::emit;
-
-// === Imports ===
 
 // === Errors ===
 
@@ -138,7 +136,7 @@ fun register_verified_encoding(
     blob_id: u256,
     timestamp_ms: u64,
 ) {
-    audio.register_encoding(AudioVerifier(), blob_id);
+    audio_encoding::register_encoding(audio, AudioVerifier(), blob_id);
     emit(AudioVerifiedEvent {
         enclave_id: object::id(enclave),
         policy_version: enclave.policy_version(),

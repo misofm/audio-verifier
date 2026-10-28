@@ -4,7 +4,10 @@
 #[test_only]
 module audio_verifier::audio_verifier_tests;
 
-use audio::audio::{Self, Audio, AudioRegistry, AudioCreatedEvent, AudioEncodingRegisteredEvent};
+use audio::{
+    audio::{Self, Audio, AudioRegistry, AudioCreatedEvent},
+    audio_encoding::{Self, AudioEncodingRegisteredEvent}
+};
 use audio_verifier::audio_verifier::{
     Self,
     AUDIO_VERIFIER,
@@ -154,8 +157,12 @@ fun verify_audio_returns_the_signed_facts_and_encoding() {
     assert_eq!(audio.samples_per_channel(), SAMPLES_PER_CHANNEL);
     assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
     assert_eq!(audio.duration_ms(), 10_000);
-    assert!(audio.has_encoding<_, AudioVerifier>(BLOB_ID));
-    assert!(!audio.encoding<_, AudioVerifier>(BLOB_ID).blob_confidentiality().is_encrypted());
+    assert!(audio_encoding::has_encoding<_, AudioVerifier>(&audio, BLOB_ID));
+    assert!(
+        !audio_encoding::encoding<_, AudioVerifier>(&audio, BLOB_ID)
+            .blob_confidentiality()
+            .is_encrypted(),
+    );
     assert_eq!(
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
@@ -222,7 +229,7 @@ fun verify_encoding_on_existing_audio_records_the_verification() {
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
-    assert!(audio.has_encoding<_, AudioVerifier>(BLOB_ID));
+    assert!(audio_encoding::has_encoding<_, AudioVerifier>(&audio, BLOB_ID));
     assert_eq!(event::events_by_type<AudioVerifiedEvent>().length(), 2);
     assert_eq!(
         event::events_by_type<
