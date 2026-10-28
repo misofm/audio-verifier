@@ -4,7 +4,7 @@
 #[test_only]
 module audio_verifier::audio_verifier_tests;
 
-use audio::audio::{Self, Audio, AudioRegistry, AudioCreatedEvent, AudioEncodingAddedEvent};
+use audio::audio::{Self, Audio, AudioRegistry, AudioCreatedEvent, AudioEncodingRegisteredEvent};
 use audio_verifier::audio_verifier::{
     Self,
     AUDIO_VERIFIER,
@@ -154,8 +154,8 @@ fun verify_audio_returns_the_signed_facts_and_encoding() {
     assert_eq!(audio.samples_per_channel(), SAMPLES_PER_CHANNEL);
     assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
     assert_eq!(audio.duration_ms(), 10_000);
-    assert!(audio.has_encoding(BLOB_ID));
-    assert!(!audio.encoding(BLOB_ID).blob_confidentiality().is_encrypted());
+    assert!(audio.has_encoding<_, AudioVerifier>(BLOB_ID));
+    assert!(!audio.encoding<_, AudioVerifier>(BLOB_ID).blob_confidentiality().is_encrypted());
     assert_eq!(
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
@@ -190,7 +190,12 @@ fun verify_audio_emits_the_verification_the_audio_and_the_encoding() {
     assert_eq!(audio_id, object::id(&audio));
     assert_eq!(blob_id, BLOB_ID);
     assert_eq!(event::events_by_type<AudioCreatedEvent<AudioVerifier>>().length(), 1);
-    assert_eq!(event::events_by_type<AudioEncodingAddedEvent<AudioVerifier>>().length(), 1);
+    assert_eq!(
+        event::events_by_type<
+            AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>,
+        >().length(),
+        1,
+    );
     assert_eq!(event::num_events(), 3);
     finish(registry, enclave, audio);
     scenario.end();
@@ -217,9 +222,14 @@ fun verify_encoding_on_existing_audio_records_the_verification() {
         SAMPLES_PER_CHANNEL,
         PCM_DIGEST,
     );
-    assert!(audio.has_encoding(BLOB_ID));
+    assert!(audio.has_encoding<_, AudioVerifier>(BLOB_ID));
     assert_eq!(event::events_by_type<AudioVerifiedEvent>().length(), 2);
-    assert_eq!(event::events_by_type<AudioEncodingAddedEvent<AudioVerifier>>().length(), 1);
+    assert_eq!(
+        event::events_by_type<
+            AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>,
+        >().length(),
+        1,
+    );
     finish(registry, enclave, audio);
     scenario.end();
 }

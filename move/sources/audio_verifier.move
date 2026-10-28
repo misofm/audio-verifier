@@ -88,7 +88,7 @@ public fun verify_audio(
         samples_per_channel,
         pcm_digest,
     );
-    record_encoding(&mut audio, enclave, blob_id, timestamp_ms);
+    register_verified_encoding(&mut audio, enclave, blob_id, timestamp_ms);
     audio
 }
 
@@ -127,18 +127,18 @@ public fun verify_encoding(
         },
         &signature,
     );
-    record_encoding(audio, enclave, blob_id, timestamp_ms);
+    register_verified_encoding(audio, enclave, blob_id, timestamp_ms);
 }
 
 // === Private Functions ===
 
-fun record_encoding(
+fun register_verified_encoding(
     audio: &mut Audio<AudioVerifier>,
     enclave: &Enclave<AUDIO_VERIFIER>,
     blob_id: u256,
     timestamp_ms: u64,
 ) {
-    audio.add_encoding(AudioVerifier(), blob_id);
+    audio.register_encoding(AudioVerifier(), blob_id);
     emit(AudioVerifiedEvent {
         enclave_id: object::id(enclave),
         policy_version: enclave.policy_version(),
