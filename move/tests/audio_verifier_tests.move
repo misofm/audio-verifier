@@ -96,7 +96,7 @@ fun finish(registry: AudioRegistry, enclave: Enclave<AUDIO_VERIFIER>, audio: Aud
     destroy(audio);
 }
 
-// === Init ===
+// === Layout ===
 
 #[test]
 fun init_shares_an_unset_policy_and_sends_its_cap() {
@@ -111,8 +111,6 @@ fun init_shares_an_unset_policy_and_sends_its_cap() {
     destroy(cap);
     scenario.end();
 }
-
-// === Layout ===
 
 #[test]
 fun audio_payload_bcs_matches_the_signed_vector() {

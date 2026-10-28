@@ -52,15 +52,13 @@ public struct AudioEncodingVerifiedEvent has copy, drop {
     blob_id: u256,
 }
 
-// === Init ===
+// === Public Functions ===
 
 fun init(otw: AUDIO_VERIFIER, ctx: &mut TxContext) {
     let (policy, cap) = enclave_policy::new(otw, ctx);
     policy.share();
     transfer::public_transfer(cap, ctx.sender());
 }
-
-// === Public Functions ===
 
 public fun verify_audio(
     registry: &mut AudioRegistry,
