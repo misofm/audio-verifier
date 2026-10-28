@@ -17,15 +17,15 @@ manifest_digest = "CD547CB1ACCE0880C835DAED2D8FFCB91D56C833AE5240D3AA5B918398263
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.mainnet.audio]
-source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "778d593dfe9f5062f53fb71b8c9fb4a6edd3970e" }
+source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "66aa27eccc6692fb026393655b2b82934bbf5207" }
 use_environment = "mainnet"
-manifest_digest = "C384006492A520ABD3E2A62AB659441D512D76DE2A045F94E46B6DAB0BC0E6A2"
+manifest_digest = "1BD46071243FB94B1EFED2921B835D1D2BE66562D06C6E08BC6F1F655942E3ED"
 deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.mainnet.audio_verifier]
 source = { root = true }
 use_environment = "mainnet"
-manifest_digest = "52ACCBE839777FA015C49AFE905371C126621B72CC0B5B216A2956E1C939362B"
+manifest_digest = "81796E54CA4A738BA71C62D6A791F05ACC51248D922E6A52F2F76A6CF86E488A"
 deps = { audio = "audio", kagi = "kagi", ori = "ori", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.mainnet.kagi]
@@ -35,7 +35,7 @@ manifest_digest = "E41BBD67BE8940D26C79D78B028477EF5B33BA217A1282C78ACB344CF8A5E
 deps = { std = "MoveStdlib", sui = "Sui" }
 
 [pinned.mainnet.ori]
-source = { git = "https://github.com/unconfirmedlabs/ori.git", subdir = "move", rev = "367ed5fe92a8b62da02c1116537cf08d111e0789" }
+source = { git = "https://github.com/unconfirmedlabs/ori.git", subdir = "move", rev = "effc16a7f4efc334ffa8f39effcc9e7bbc3f837c" }
 use_environment = "mainnet"
 manifest_digest = "E41BBD67BE8940D26C79D78B028477EF5B33BA217A1282C78ACB344CF8A5ECF6"
 deps = { std = "MoveStdlib", sui = "Sui" }
@@ -53,15 +53,15 @@ manifest_digest = "7AFB66695545775FBFBB2D3078ADFD084244D5002392E837FDE21D9EA1C6D
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.testnet.audio]
-source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "778d593dfe9f5062f53fb71b8c9fb4a6edd3970e" }
+source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "66aa27eccc6692fb026393655b2b82934bbf5207" }
 use_environment = "testnet"
-manifest_digest = "7C4A14C06348625FD571B1CF30D4669A72A67304FD19876F629605F24D752C3D"
+manifest_digest = "2A4194F848AEE36A21F1896294B81B8CE86329EBF74C9153BD5FAE2B07994B85"
 deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.testnet.audio_verifier]
 source = { root = true }
 use_environment = "testnet"
-manifest_digest = "A9FAEFE204A06260F60AC2A6DE8E77FAFBF21D8F4B1A8AE8E2B16CEA1C76F8D3"
+manifest_digest = "2FFACD3F855D204ABA6F0C21924DD975142D98D949E7D39D6038BCBC65603776"
 deps = { audio = "audio", kagi = "kagi", ori = "ori", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.testnet.kagi]
@@ -71,7 +71,7 @@ manifest_digest = "5745706258F61D6CE210904B3E6AE87A73CE9D31A6F93BE4718C442529332
 deps = { std = "MoveStdlib", sui = "Sui" }
 
 [pinned.testnet.ori]
-source = { git = "https://github.com/unconfirmedlabs/ori.git", subdir = "move", rev = "367ed5fe92a8b62da02c1116537cf08d111e0789" }
+source = { git = "https://github.com/unconfirmedlabs/ori.git", subdir = "move", rev = "effc16a7f4efc334ffa8f39effcc9e7bbc3f837c" }
 use_environment = "testnet"
 manifest_digest = "5745706258F61D6CE210904B3E6AE87A73CE9D31A6F93BE4718C442529332A87"
 deps = { std = "MoveStdlib", sui = "Sui" }
