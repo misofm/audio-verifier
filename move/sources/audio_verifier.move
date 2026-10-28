@@ -115,7 +115,6 @@ public fun verify_encoding(
         },
         &signature,
     );
-    if (audio_encoding::has_encoding<AudioVerifier, AudioVerifier>(audio, blob_id)) return;
     audio_encoding::register_encoding(audio, AudioVerifier(), blob_id);
     emit(AudioEncodingVerifiedEvent {
         enclave_id: object::id(enclave),

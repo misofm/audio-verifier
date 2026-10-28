@@ -340,10 +340,10 @@ fun verify_encoding_registers_the_blob_and_emits_the_verification() {
     scenario.end();
 }
 
-#[test]
-fun verifying_an_encoding_again_is_a_silent_no_op() {
+#[test, expected_failure(abort_code = audio_encoding::EAlreadyRegistered)]
+fun verifying_an_encoding_again_aborts() {
     let mut scenario = test_scenario::begin(PUBLISHER);
-    let (registry, enclave, mut audio) = verified(&mut scenario);
+    let (_registry, enclave, mut audio) = verified(&mut scenario);
     audio_verifier::verify_encoding(
         &mut audio,
         &enclave,
@@ -358,15 +358,7 @@ fun verifying_an_encoding_again_is_a_silent_no_op() {
         SIGNED_AT_MS,
         ENCODING_SIGNATURE,
     );
-    assert_eq!(event::events_by_type<AudioEncodingVerifiedEvent>().length(), 1);
-    assert_eq!(
-        event::events_by_type<
-            AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>,
-        >().length(),
-        1,
-    );
-    finish(registry, enclave, audio);
-    scenario.end();
+    abort
 }
 
 #[test, expected_failure(abort_code = enclave::EInvalidSignature)]
