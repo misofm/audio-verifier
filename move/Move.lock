@@ -17,7 +17,7 @@ manifest_digest = "CD547CB1ACCE0880C835DAED2D8FFCB91D56C833AE5240D3AA5B918398263
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.mainnet.audio]
-source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "66aa27eccc6692fb026393655b2b82934bbf5207" }
+source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "5d5abb82aa21ea3f169e9dbd2f72a4ae835cb24c" }
 use_environment = "mainnet"
 manifest_digest = "1BD46071243FB94B1EFED2921B835D1D2BE66562D06C6E08BC6F1F655942E3ED"
 deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
@@ -25,8 +25,8 @@ deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
 [pinned.mainnet.audio_verifier]
 source = { root = true }
 use_environment = "mainnet"
-manifest_digest = "81796E54CA4A738BA71C62D6A791F05ACC51248D922E6A52F2F76A6CF86E488A"
-deps = { audio = "audio", kagi = "kagi", ori = "ori", std = "MoveStdlib", sui = "Sui" }
+manifest_digest = "A0C2B480103301DBBD09521E3FFEA7E02EC7AB2FAA06AC5A7C7E61342A345F5D"
+deps = { audio = "audio", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.mainnet.kagi]
 source = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "d2cf902e621c46b81bd08e8a3faf9327c2f4e865" }
@@ -53,7 +53,7 @@ manifest_digest = "7AFB66695545775FBFBB2D3078ADFD084244D5002392E837FDE21D9EA1C6D
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.testnet.audio]
-source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "66aa27eccc6692fb026393655b2b82934bbf5207" }
+source = { git = "https://github.com/misofm/audio.git", subdir = ".", rev = "5d5abb82aa21ea3f169e9dbd2f72a4ae835cb24c" }
 use_environment = "testnet"
 manifest_digest = "2A4194F848AEE36A21F1896294B81B8CE86329EBF74C9153BD5FAE2B07994B85"
 deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
@@ -61,8 +61,8 @@ deps = { ori = "ori", std = "MoveStdlib", sui = "Sui" }
 [pinned.testnet.audio_verifier]
 source = { root = true }
 use_environment = "testnet"
-manifest_digest = "2FFACD3F855D204ABA6F0C21924DD975142D98D949E7D39D6038BCBC65603776"
-deps = { audio = "audio", kagi = "kagi", ori = "ori", std = "MoveStdlib", sui = "Sui" }
+manifest_digest = "2CD005C0F331A5834329EFDC0E627C8BC072194A44D1A79EE9ADF34DD0BD2EE7"
+deps = { audio = "audio", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.testnet.kagi]
 source = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "d2cf902e621c46b81bd08e8a3faf9327c2f4e865" }

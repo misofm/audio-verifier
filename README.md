@@ -41,7 +41,7 @@ Set the upload limit with `--max-body-bytes` after Cargo's `--`, or with `AUDIO_
 
 ## Use on Sui
 
-Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. Pass the returned audio fields, timestamp, and signature to `audio_verifier::audio_verifier::verify`. It verifies the signature against the registered enclave and returns `Audio<AudioVerifier>`.
+Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. Pass the returned audio fields, timestamp, and signature to `audio_verifier::audio_verifier::verify_audio` for new audio, or `verify_encoding` for another file of an existing `Audio<AudioVerifier>`. Both verify the signature against the registered enclave.
 
 See [move/README.md](move/README.md) for the API and policy setup.
 

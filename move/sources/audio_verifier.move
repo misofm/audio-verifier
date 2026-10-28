@@ -3,14 +3,16 @@
 
 module audio_verifier::audio_verifier;
 
-// === Imports ===
-
+use audio::audio::{Self, Audio, AudioRegistry};
+use kagi::{enclave::Enclave, enclave_policy};
 use std::string::String;
 use sui::event::emit;
-use audio::audio::{Self, Audio};
-use kagi::enclave::Enclave;
-use kagi::enclave_policy;
-use ori::{confidentiality, data};
+
+// === Imports ===
+
+// === Errors ===
+
+const EWrongAudio: u64 = 0;
 
 // === Constants ===
 
@@ -38,7 +40,7 @@ public struct AudioVerifiedEvent has copy, drop {
     enclave_id: ID,
     policy_version: u64,
     verified_at_ms: u64,
-    pcm_digest: vector<u8>,
+    audio_id: ID,
     blob_id: u256,
 }
 
@@ -50,7 +52,8 @@ fun init(otw: AUDIO_VERIFIER, ctx: &mut TxContext) {
     transfer::public_transfer(cap, ctx.sender());
 }
 
-public fun verify(
+public fun verify_audio(
+    registry: &mut AudioRegistry,
     enclave: &Enclave<AUDIO_VERIFIER>,
     format: String,
     channels: u8,
@@ -76,23 +79,73 @@ public fun verify(
         },
         &signature,
     );
+    let mut audio = audio::new(
+        registry,
+        AudioVerifier(),
+        sample_rate_hz,
+        channels,
+        bit_depth,
+        samples_per_channel,
+        pcm_digest,
+    );
+    record_encoding(&mut audio, enclave, blob_id, timestamp_ms);
+    audio
+}
+
+public fun verify_encoding(
+    audio: &mut Audio<AudioVerifier>,
+    enclave: &Enclave<AUDIO_VERIFIER>,
+    format: String,
+    channels: u8,
+    bit_depth: u8,
+    sample_rate_hz: u32,
+    samples_per_channel: u64,
+    pcm_digest: vector<u8>,
+    blob_id: u256,
+    timestamp_ms: u64,
+    signature: vector<u8>,
+) {
+    assert!(
+        audio.sample_rate_hz() == sample_rate_hz &&
+        audio.channels() == channels &&
+        audio.bit_depth() == bit_depth &&
+        audio.samples_per_channel() == samples_per_channel &&
+        audio.pcm_digest() == &pcm_digest,
+        EWrongAudio,
+    );
+    enclave.verify_signature(
+        AUDIO_INTENT,
+        timestamp_ms,
+        AudioVerificationPayload {
+            format,
+            channels,
+            bit_depth,
+            sample_rate_hz,
+            samples_per_channel,
+            pcm_digest,
+            blob_id,
+        },
+        &signature,
+    );
+    record_encoding(audio, enclave, blob_id, timestamp_ms);
+}
+
+// === Private Functions ===
+
+fun record_encoding(
+    audio: &mut Audio<AudioVerifier>,
+    enclave: &Enclave<AUDIO_VERIFIER>,
+    blob_id: u256,
+    timestamp_ms: u64,
+) {
+    audio.add_encoding(AudioVerifier(), blob_id);
     emit(AudioVerifiedEvent {
         enclave_id: object::id(enclave),
         policy_version: enclave.policy_version(),
         verified_at_ms: timestamp_ms,
-        pcm_digest,
+        audio_id: object::id(audio),
         blob_id,
     });
-    audio::new(
-        AudioVerifier(),
-        format,
-        channels,
-        bit_depth,
-        sample_rate_hz,
-        samples_per_channel,
-        pcm_digest,
-        data::new_blob(blob_id, confidentiality::new_unencrypted()),
-    )
 }
 
 // === Test Functions ===
@@ -124,8 +177,6 @@ public fun new_audio_verification_payload_for_testing(
 }
 
 #[test_only]
-public fun audio_verified_event_fields(
-    event: &AudioVerifiedEvent,
-): (ID, u64, u64, vector<u8>, u256) {
-    (event.enclave_id, event.policy_version, event.verified_at_ms, event.pcm_digest, event.blob_id)
+public fun audio_verified_event_fields(event: &AudioVerifiedEvent): (ID, u64, u64, ID, u256) {
+    (event.enclave_id, event.policy_version, event.verified_at_ms, event.audio_id, event.blob_id)
 }
