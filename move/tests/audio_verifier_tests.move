@@ -17,7 +17,7 @@ use audio_verifier::audio_verifier::{
 };
 use kagi::{enclave::{Self, Enclave}, enclave_policy::{EnclavePolicy, EnclavePolicyCap}};
 use std::{bcs, unit_test::{assert_eq, destroy}};
-use sui::{event, test_scenario::{Self, Scenario}};
+use sui::{derived_object, event, test_scenario::{Self, Scenario}};
 
 // === Constants ===
 
@@ -193,7 +193,7 @@ fun verify_audio_emits_the_verification_and_the_audio() {
     scenario.end();
 }
 
-#[test, expected_failure(abort_code = audio::EAudioExists)]
+#[test, expected_failure(abort_code = derived_object::EObjectAlreadyExists)]
 fun verify_audio_rejects_registered_audio() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let (mut registry, enclave, _audio) = verified(&mut scenario);
@@ -343,7 +343,7 @@ fun verify_encoding_registers_the_blob_and_emits_the_verification() {
 }
 
 #[test]
-fun verifying_an_encoding_again_registers_it_once() {
+fun verifying_an_encoding_again_is_a_silent_no_op() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let (registry, enclave, mut audio) = verified(&mut scenario);
     audio_verifier::verify_encoding(
@@ -360,7 +360,7 @@ fun verifying_an_encoding_again_registers_it_once() {
         SIGNED_AT_MS,
         ENCODING_SIGNATURE,
     );
-    assert_eq!(event::events_by_type<AudioEncodingVerifiedEvent>().length(), 2);
+    assert_eq!(event::events_by_type<AudioEncodingVerifiedEvent>().length(), 1);
     assert_eq!(
         event::events_by_type<
             AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>,
