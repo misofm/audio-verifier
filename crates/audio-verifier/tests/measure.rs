@@ -1,6 +1,6 @@
 mod common;
 
-use audio_verifier::{AudioVerificationPayload, Error, blob_id_base64, compute_blob_id};
+use audio_verifier::{AudioEncodingPayload, Error, blob_id_base64, compute_blob_id};
 use common::{
     FrameEdit, FrameHeader, Rate, Synth, block_sizes, committed_blob_id, decoded_samples, ffmpeg,
     ffmpeg_raw_pcm, fixture, fixture_path, frame_sizes, pcm_md5, scratch_file, set_block_sizes,
@@ -8,7 +8,7 @@ use common::{
 };
 
 // Optional migration evidence from the same inputs and assertions as this suite.
-fn measure(bytes: &[u8]) -> Result<AudioVerificationPayload, Error> {
+fn measure(bytes: &[u8]) -> Result<AudioEncodingPayload, Error> {
     let result = audio_verifier::measure(bytes);
     if let Some(directory) = std::env::var_os("AUDIO_VERIFIER_MIGRATION_RESULTS") {
         let directory = std::path::PathBuf::from(directory);
@@ -105,13 +105,12 @@ fn flac_name(name: &str) -> String {
 }
 
 fn assert_properties(
-    audio: &AudioVerificationPayload,
+    audio: &AudioEncodingPayload,
     channels: u8,
     bit_depth: u8,
     rate: u32,
     samples_per_channel: u64,
 ) {
-    assert_eq!(audio.format, "flac");
     assert_eq!(audio.channels, channels);
     assert_eq!(audio.bit_depth, bit_depth);
     assert_eq!(audio.sample_rate_hz, rate);
@@ -119,7 +118,7 @@ fn assert_properties(
     assert_eq!(audio.pcm_digest.len(), 32);
 }
 
-fn assert_matches_ffmpeg(bytes: &[u8], audio: &AudioVerificationPayload, scratch_name: &str) {
+fn assert_matches_ffmpeg(bytes: &[u8], audio: &AudioEncodingPayload, scratch_name: &str) {
     let Some(ffmpeg) = ffmpeg() else {
         eprintln!("ffmpeg unavailable, skipping PCM cross-check for {scratch_name}");
         return;

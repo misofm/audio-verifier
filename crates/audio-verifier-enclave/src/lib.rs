@@ -1,14 +1,17 @@
 use std::time::Duration;
 
 use audio_verifier::{
-    AudioVerificationPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal,
+    AudioEncodingPayload, AudioPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal,
 };
 use axum::{Router, body::Bytes};
 use nautilus::{ConfigError, Intent, NautilusContext, NautilusError, ServerConfig, SignedResponse};
 use serde::{Deserialize, Serialize};
 
-/// Intent of the signed `IntentMessage<AudioVerificationPayload>`.
+/// Intent of the signed `IntentMessage<AudioPayload>`.
 pub const AUDIO_INTENT: Intent = Intent(0);
+
+/// Intent of the signed `IntentMessage<AudioEncodingPayload>`.
+pub const AUDIO_ENCODING_INTENT: Intent = Intent(1);
 
 /// Default `/process_data` body limit.
 pub const DEFAULT_MAX_BODY_BYTES: usize = 256 * 1024 * 1024;
@@ -37,11 +40,9 @@ pub const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 /// Environment variable that overrides the body limit.
 pub const MAX_BODY_BYTES_ENV: &str = "AUDIO_VERIFIER_MAX_BODY_BYTES";
 
-/// JSON view of a signed `AudioVerificationPayload`.
+/// JSON view of an `AudioPayload`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AudioJson {
-    /// Canonical format name.
-    pub format: String,
     /// Channel count.
     pub channels: u8,
     /// Bits per sample.
@@ -52,57 +53,91 @@ pub struct AudioJson {
     pub samples_per_channel: String,
     /// BLAKE3 PCM digest as hex.
     pub pcm_digest: String,
+}
+
+impl From<&AudioPayload> for AudioJson {
+    fn from(audio: &AudioPayload) -> Self {
+        Self {
+            channels: audio.channels,
+            bit_depth: audio.bit_depth,
+            sample_rate_hz: audio.sample_rate_hz,
+            samples_per_channel: audio.samples_per_channel.to_string(),
+            pcm_digest: hex::encode(&audio.pcm_digest),
+        }
+    }
+}
+
+/// JSON view of an `AudioEncodingPayload` beyond the audio facts, which are in [`AudioJson`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioEncodingJson {
     /// Walrus base64url blob ID.
     pub blob_id: String,
     /// Blob ID as the decimal Move `u256`.
     pub blob_id_u256: String,
 }
 
-impl From<&AudioVerificationPayload> for AudioJson {
-    fn from(audio: &AudioVerificationPayload) -> Self {
+impl From<&AudioEncodingPayload> for AudioEncodingJson {
+    fn from(encoding: &AudioEncodingPayload) -> Self {
         Self {
-            format: audio.format.clone(),
-            channels: audio.channels,
-            bit_depth: audio.bit_depth,
-            sample_rate_hz: audio.sample_rate_hz,
-            samples_per_channel: audio.samples_per_channel.to_string(),
-            pcm_digest: hex::encode(&audio.pcm_digest),
-            blob_id: blob_id_base64(&audio.blob_id),
-            blob_id_u256: u256_le_decimal(&audio.blob_id),
+            blob_id: blob_id_base64(&encoding.blob_id),
+            blob_id_u256: u256_le_decimal(&encoding.blob_id),
         }
     }
 }
 
-/// `/process_data` response body.
+/// One signed payload in the `/process_data` response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProcessDataResponse {
+pub struct SignedJson<T> {
     /// Intent byte.
     pub intent: u8,
     /// Signing time in milliseconds since the Unix epoch, from the enclave clock.
     pub timestamp_ms: u64,
-    /// Measured audio.
-    pub audio: AudioJson,
+    /// The payload's fields.
+    #[serde(flatten)]
+    pub data: T,
     /// Ed25519 signature over the BCS intent message, as hex.
     pub signature: String,
+}
+
+impl<T> SignedJson<T> {
+    fn new<P>(signed: &SignedResponse<P>, data: T) -> Self {
+        Self {
+            intent: signed.response.intent.0,
+            timestamp_ms: signed.response.timestamp_ms,
+            data,
+            signature: signed.signature.clone(),
+        }
+    }
+}
+
+/// `/process_data` response body: the audio and the file, signed separately.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessDataResponse {
+    /// The audio facts, for `verify_audio`.
+    pub audio: SignedJson<AudioJson>,
+    /// The file's blob ID, for `verify_encoding`; the signed facts are those in `audio`.
+    pub audio_encoding: SignedJson<AudioEncodingJson>,
     /// Enclave Ed25519 public key as hex.
     pub public_key: String,
 }
 
-/// Renders a signed `AudioVerificationPayload` as the `/process_data` response.
+/// Renders the two signed payloads as the `/process_data` response.
 pub fn response(
     ctx: &NautilusContext,
-    signed: SignedResponse<AudioVerificationPayload>,
+    audio: SignedResponse<AudioPayload>,
+    encoding: SignedResponse<AudioEncodingPayload>,
 ) -> ProcessDataResponse {
     ProcessDataResponse {
-        intent: signed.response.intent.0,
-        timestamp_ms: signed.response.timestamp_ms,
-        audio: AudioJson::from(&signed.response.data),
-        signature: signed.signature,
+        audio: SignedJson::new(&audio, AudioJson::from(&audio.response.data)),
+        audio_encoding: SignedJson::new(
+            &encoding,
+            AudioEncodingJson::from(&encoding.response.data),
+        ),
         public_key: ctx.public_key_hex(),
     }
 }
 
-/// Measures `bytes` and signs the result.
+/// Measures `bytes` once and signs the audio and the encoding.
 pub fn process(bytes: &[u8], ctx: &NautilusContext) -> Result<ProcessDataResponse, NautilusError> {
     let info = StreamInfo::parse_canonical(bytes)
         .and_then(|info| info.validate().map(|()| info))
@@ -116,8 +151,10 @@ pub fn process(bytes: &[u8], ctx: &NautilusContext) -> Result<ProcessDataRespons
             "decoded PCM exceeds the 4 GiB service limit",
         ));
     }
-    let audio = measure(bytes).map_err(|error| NautilusError::application(error.to_string()))?;
-    Ok(response(ctx, ctx.sign_intent(AUDIO_INTENT, audio)?))
+    let encoding = measure(bytes).map_err(|error| NautilusError::application(error.to_string()))?;
+    let audio = ctx.sign_intent(AUDIO_INTENT, encoding.audio())?;
+    let encoding = ctx.sign_intent(AUDIO_ENCODING_INTENT, encoding)?;
+    Ok(response(ctx, audio, encoding))
 }
 
 /// Server limits for one request at a time; pass the same value to the router and the listener.
