@@ -183,12 +183,12 @@ public fun new_audio_encoding_payload_for_testing(
 }
 
 #[test_only]
-public fun audio_verified_event_fields(event: &AudioVerifiedEvent): (ID, u64, u64, ID) {
+public fun audio_verified_fields_for_testing(event: &AudioVerifiedEvent): (ID, u64, u64, ID) {
     (event.enclave_id, event.policy_version, event.verified_at_ms, event.audio_id)
 }
 
 #[test_only]
-public fun audio_encoding_verified_event_fields(
+public fun audio_encoding_verified_fields_for_testing(
     event: &AudioEncodingVerifiedEvent,
 ): (ID, u64, u64, ID, u256) {
     (event.enclave_id, event.policy_version, event.verified_at_ms, event.audio_id, event.blob_id)

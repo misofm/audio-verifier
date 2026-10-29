@@ -180,7 +180,7 @@ fun verify_audio_emits_the_verification_and_the_audio() {
         policy_version,
         verified_at_ms,
         audio_id,
-    ) = audio_verifier::audio_verified_event_fields(&events[0]);
+    ) = audio_verifier::audio_verified_fields_for_testing(&events[0]);
     assert_eq!(enclave_id, object::id(&enclave));
     assert_eq!(policy_version, POLICY_VERSION);
     assert_eq!(verified_at_ms, SIGNED_AT_MS);
@@ -324,7 +324,7 @@ fun verify_encoding_registers_the_blob_and_emits_the_verification() {
         verified_at_ms,
         audio_id,
         blob_id,
-    ) = audio_verifier::audio_encoding_verified_event_fields(&events[0]);
+    ) = audio_verifier::audio_encoding_verified_fields_for_testing(&events[0]);
     assert_eq!(enclave_id, object::id(&enclave));
     assert_eq!(policy_version, POLICY_VERSION);
     assert_eq!(verified_at_ms, SIGNED_AT_MS);
@@ -340,7 +340,7 @@ fun verify_encoding_registers_the_blob_and_emits_the_verification() {
     scenario.end();
 }
 
-#[test, expected_failure(abort_code = audio_encoding::EAlreadyRegistered)]
+#[test, expected_failure(abort_code = audio_encoding::EEncodingAlreadyRegistered)]
 fun verifying_an_encoding_again_aborts() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let (_registry, enclave, mut audio) = verified(&mut scenario);
