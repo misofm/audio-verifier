@@ -6,4 +6,4 @@ authors = ["Miso Labs, Inc. (build@miso.fm)"]
 
 [dependencies]
 audio = { git = "https://github.com/misofm/audio.git", rev = "da67e9bdbb7f15fa3dc983aa31498cb2cba9a7af" }
-kagi = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "d2cf902e621c46b81bd08e8a3faf9327c2f4e865" }
+kagi = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "3f27e6884ab094a1d9b08c65e30dd1b478cd6941" }
