@@ -17,16 +17,22 @@ manifest_digest = "CD547CB1ACCE0880C835DAED2D8FFCB91D56C833AE5240D3AA5B918398263
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.mainnet.audio]
-source = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "561869d328004b9dacf30c09b943eea1429b6f9d" }
+source = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "a5a6a8ba5e0234c096e3a6c1a1ff14daf6c7625a" }
 use_environment = "mainnet"
 manifest_digest = "E41BBD67BE8940D26C79D78B028477EF5B33BA217A1282C78ACB344CF8A5ECF6"
 deps = { std = "MoveStdlib", sui = "Sui" }
 
+[pinned.mainnet.audio_encoding]
+source = { git = "https://github.com/misofm/framework.git", subdir = "audio_encoding", rev = "a5a6a8ba5e0234c096e3a6c1a1ff14daf6c7625a" }
+use_environment = "mainnet"
+manifest_digest = "1D77442C8B0E14ECBB98DA6B81F50EB65DDAF6D4F69A3B8F00058A89C3F973D6"
+deps = { audio = "audio", std = "MoveStdlib", sui = "Sui" }
+
 [pinned.mainnet.audio_verifier]
 source = { root = true }
 use_environment = "mainnet"
-manifest_digest = "C9CF48A3804206BCB1029BABDC372B22A2814E71DCFC9411646D78CC6D891BA9"
-deps = { audio = "audio", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
+manifest_digest = "2E5C5CFE83470DD8F926C683E83A6CE0A4B5381D6114E7826A14002A4534AB71"
+deps = { audio = "audio", audio_encoding = "audio_encoding", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.mainnet.kagi]
 source = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "70a85e356aafc2f539aca117423e8c0a75ffb5f6" }
@@ -47,16 +53,22 @@ manifest_digest = "7AFB66695545775FBFBB2D3078ADFD084244D5002392E837FDE21D9EA1C6D
 deps = { MoveStdlib = "MoveStdlib" }
 
 [pinned.testnet.audio]
-source = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "561869d328004b9dacf30c09b943eea1429b6f9d" }
+source = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "a5a6a8ba5e0234c096e3a6c1a1ff14daf6c7625a" }
 use_environment = "testnet"
 manifest_digest = "5745706258F61D6CE210904B3E6AE87A73CE9D31A6F93BE4718C442529332A87"
 deps = { std = "MoveStdlib", sui = "Sui" }
 
+[pinned.testnet.audio_encoding]
+source = { git = "https://github.com/misofm/framework.git", subdir = "audio_encoding", rev = "a5a6a8ba5e0234c096e3a6c1a1ff14daf6c7625a" }
+use_environment = "testnet"
+manifest_digest = "EAD7ECF665F3F9C43E7B8E6731C2C33D34E2CA3AD81B2C3B09DFDFC0D310E23C"
+deps = { audio = "audio", std = "MoveStdlib", sui = "Sui" }
+
 [pinned.testnet.audio_verifier]
 source = { root = true }
 use_environment = "testnet"
-manifest_digest = "A9F4FF7E8EE84D8450D7136491AB27ABA1ED6795AC919F671DA5EC0D7B64FAAC"
-deps = { audio = "audio", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
+manifest_digest = "8D3D4266E55F52ED8A97E226C7A042208274E949478ABC01F080AC7A38A7040B"
+deps = { audio = "audio", audio_encoding = "audio_encoding", kagi = "kagi", std = "MoveStdlib", sui = "Sui" }
 
 [pinned.testnet.kagi]
 source = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "70a85e356aafc2f539aca117423e8c0a75ffb5f6" }

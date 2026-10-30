@@ -4,10 +4,8 @@
 #[test_only]
 module audio_verifier::audio_verifier_tests;
 
-use audio::{
-    audio::{Self, Audio, AudioRegistry, AudioCreatedEvent},
-    audio_encoding::{Self, AudioEncodingRegisteredEvent}
-};
+use audio::audio::{Self, Audio, AudioRegistry, AudioCreatedEvent};
+use audio_encoding::audio_encoding::{Self, AudioEncodingRegisteredEvent};
 use audio_verifier::audio_verifier::{
     Self,
     AUDIO_VERIFIER,

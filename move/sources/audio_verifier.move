@@ -3,7 +3,8 @@
 
 module audio_verifier::audio_verifier;
 
-use audio::{audio::{Self, Audio, AudioRegistry}, audio_encoding};
+use audio::audio::{Self, Audio, AudioRegistry};
+use audio_encoding::audio_encoding;
 use kagi::{enclave::Enclave, enclave_policy};
 use sui::event::emit;
 

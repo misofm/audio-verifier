@@ -38,7 +38,7 @@ audio_verifier = { git = "https://github.com/misofm/audio-verifier.git", subdir 
 ## Events
 
 - `AudioVerifiedEvent { enclave_id, policy_version, verified_at_ms, audio_id }` and `audio::audio::AudioCreatedEvent<AudioVerifier>` from `verify_audio`.
-- `AudioEncodingVerifiedEvent { enclave_id, policy_version, verified_at_ms, audio_id, blob_id }` from each `verify_encoding` that registers a new blob, and `audio::audio_encoding::AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>` the first time each blob is registered. This package is both the Audio's verifier and its encoding verifier, so consumers read its encodings with `audio_encoding::has_encoding<AudioVerifier, AudioVerifier>`.
+- `AudioEncodingVerifiedEvent { enclave_id, policy_version, verified_at_ms, audio_id, blob_id }` from each `verify_encoding` that registers a new blob, and `audio_encoding::audio_encoding::AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>` the first time each blob is registered. This package is both the Audio's verifier and its encoding verifier, so consumers read its encodings with `audio_encoding::has_encoding<AudioVerifier, AudioVerifier>`.
 - kagi emits the policy and enclave events.
 
 ## Layout and testing
