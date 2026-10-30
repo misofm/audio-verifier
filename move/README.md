@@ -1,6 +1,6 @@
 # audio_verifier (Move package)
 
-`verify_audio` creates an [`audio::Audio<AudioVerifier>`](https://github.com/misofm/audio), the canonical record of lossless audio measured inside a Nautilus (AWS Nitro) enclave and checked on Sui, and `verify_encoding` registers a file as an encoding of it. The enclave signs the two claims separately. `AudioVerifier` is this package's witness, and only a signature from a registered `Enclave<AUDIO_VERIFIER>` can produce either. Consumers that trust this enclave pin `Audio<audio_verifier::audio_verifier::AudioVerifier>`.
+`verify_audio` creates an [`audio::Audio<AudioVerifier>`](https://github.com/misofm/framework/tree/main/audio), the canonical record of lossless audio measured inside a Nautilus (AWS Nitro) enclave and checked on Sui, and `verify_encoding` registers a file as an encoding of it. The enclave signs the two claims separately. `AudioVerifier` is this package's witness, and only a signature from a registered `Enclave<AUDIO_VERIFIER>` can produce either. Consumers that trust this enclave pin `Audio<audio_verifier::audio_verifier::AudioVerifier>`.
 
 There is no docs.miso.fm page yet, so the facts are below.
 

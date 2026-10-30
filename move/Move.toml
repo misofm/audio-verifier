@@ -5,5 +5,5 @@ license = "FSL-1.1-ALv2"
 authors = ["Miso Labs, Inc. (contact@miso.fm)"]
 
 [dependencies]
-audio = { git = "https://github.com/misofm/audio.git", rev = "88ddceb0cba02d8af3b4d4fe5e06ed16c73c0d0e" }
+audio = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "91f4d0929b2713b20a62075497085ea59a9e9de8" }
 kagi = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "70a85e356aafc2f539aca117423e8c0a75ffb5f6" }
