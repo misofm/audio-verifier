@@ -2,7 +2,7 @@
 
 Measures FLAC audio inside a Nautilus enclave on AWS Nitro and verifies the signed results on Sui. It checks the decoded audio, computes a BLAKE3 PCM digest, and signs the audio's channels, bit depth, sample rate, sample count and PCM digest. It signs nothing about the file itself.
 
-The Move package verifies the signature and creates the canonical, frozen `Audio<AudioVerifier>` for use by other applications. Files are not on-chain: anyone can check a file against an Audio by decoding it and comparing the BLAKE3 digest of its PCM with `pcm_digest`. This verifies technical properties of the audio; it does not establish authorship or ownership.
+The [`audio_verifier`](https://github.com/misofm/framework/tree/main/audio_verifier) Move package, in `misofm/framework`, verifies the signature and creates the canonical, frozen `Audio<AudioVerifier>` for use by other applications. Files are not on-chain: anyone can check a file against an Audio by decoding it and comparing the BLAKE3 digest of its PCM with `pcm_digest`. This verifies technical properties of the audio; it does not establish authorship or ownership.
 
 ## Supported input
 
@@ -41,9 +41,9 @@ Set the upload limit with `--max-body-bytes` after Cargo's `--`, or with `AUDIO_
 
 ## Use on Sui
 
-Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. For new audio, pass `audio`'s fields, timestamp and signature to `audio_verifier::audio_verifier::verify_audio`, which checks the signature against the registered enclave, then freeze the returned Audio with `audio.freeze()` in the same transaction.
+Publish the [`audio_verifier` Move package](https://github.com/misofm/framework/tree/main/audio_verifier), configure its enclave policy, and register an attested enclave. For new audio, pass `audio`'s fields, timestamp and signature to `audio_verifier::audio_verifier::verify_audio`, which checks the signature against the registered enclave, then freeze the returned Audio with `audio.freeze()` in the same transaction.
 
-See [move/README.md](move/README.md) for the API and policy setup.
+See its [README](https://github.com/misofm/framework/tree/main/audio_verifier) for the API and policy setup.
 
 ## Run in an enclave
 
@@ -62,10 +62,9 @@ The image is written to `out/nitro.eif`. The default enclave allocation is four 
 
 ```sh
 cargo test --locked --workspace
-(cd move && sui move test)
 ```
 
-Move tests require the Sui CLI. Installing `ffmpeg` enables additional decoder cross-checks in the Rust tests.
+Installing `ffmpeg` enables additional decoder cross-checks. The Move package's tests live with it in `misofm/framework`.
 
 ## License
 

@@ -1,9 +1,0 @@
-[package]
-name = "audio_verifier"
-edition = "2024"
-license = "FSL-1.1-ALv2"
-authors = ["Miso Labs, Inc. (contact@miso.fm)"]
-
-[dependencies]
-audio = { git = "https://github.com/misofm/framework.git", subdir = "audio", rev = "836622475528d8dbeb995a4e7703477996726ae4" }
-kagi = { git = "https://github.com/unconfirmedlabs/kagi.git", subdir = "move", rev = "70a85e356aafc2f539aca117423e8c0a75ffb5f6" }

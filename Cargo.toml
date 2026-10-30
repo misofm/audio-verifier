@@ -8,7 +8,7 @@ edition = "2024"
 rust-version = "1.94"
 license = "FSL-1.1-ALv2"
 publish = false
-repository = "https://github.com/misofm/audio-verifier"
+repository = "https://github.com/misofm/audio-verifier-enclave"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
