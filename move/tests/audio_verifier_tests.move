@@ -157,7 +157,7 @@ fun verify_audio_returns_the_signed_facts_without_an_encoding() {
     assert_eq!(
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
-            object::id(&registry),
+            &registry,
             CHANNELS,
             BIT_DEPTH,
             SAMPLE_RATE_HZ,
