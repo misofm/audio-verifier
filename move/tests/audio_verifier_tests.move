@@ -5,14 +5,7 @@
 module audio_verifier::audio_verifier_tests;
 
 use audio::audio::{Self, Audio, AudioRegistry, AudioCreatedEvent};
-use audio_encoding::audio_encoding::{Self, AudioEncodingRegisteredEvent};
-use audio_verifier::audio_verifier::{
-    Self,
-    AUDIO_VERIFIER,
-    AudioVerifier,
-    AudioVerifiedEvent,
-    AudioEncodingVerifiedEvent,
-};
+use audio_verifier::audio_verifier::{Self, AUDIO_VERIFIER, AudioVerifier, AudioVerifiedEvent};
 use kagi::{enclave::{Self, Enclave}, enclave_policy::{EnclavePolicy, EnclavePolicyCap}};
 use std::{bcs, unit_test::{assert_eq, destroy}};
 use sui::{derived_object, event, test_scenario::{Self, Scenario}};
@@ -29,7 +22,6 @@ const BIT_DEPTH: u8 = 24;
 const SAMPLE_RATE_HZ: u32 = 48_000;
 const SAMPLES_PER_CHANNEL: u64 = 480_000;
 const PCM_DIGEST: vector<u8> = x"1111111111111111111111111111111111111111111111111111111111111111";
-const BLOB_ID: u256 = 14074904626401341155369551180448584754667373453244490859944217516317499064576;
 const AUDIO_PAYLOAD: vector<u8> =
     x"021880bb00000053070000000000201111111111111111111111111111111111111111111111111111111111111111";
 const AUDIO_MESSAGE: vector<u8> =
@@ -38,14 +30,6 @@ const AUDIO_SIGNATURE: vector<u8> =
     x"eeb10727367e2bfe4fe5ebe15275562f01531e4749a3a9822b40c427d6b95b7dfd324a26a8e9c4b80a379e3c66457935514a1bb912cf4bf85f255afa4b0d0709";
 const AUDIO_OTHER_INTENT_SIGNATURE: vector<u8> =
     x"4f08c5a99b14a40ae5921f60bb945f8e40373608e97bc0557819ccf87ed6a4cf8a14f4249cc4652d14074ce205a919c761fde7ed5d6140514699ab5295622f04";
-const ENCODING_PAYLOAD: vector<u8> =
-    x"021880bb00000053070000000000201111111111111111111111111111111111111111111111111111111111111111000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-const ENCODING_MESSAGE: vector<u8> =
-    x"0100dc207497010000021880bb00000053070000000000201111111111111111111111111111111111111111111111111111111111111111000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-const ENCODING_SIGNATURE: vector<u8> =
-    x"25bf0d9ec6702100f2081d95bd968f5135eb3a292c1de0e1d09054a1d668018ed40eeb60907b14c6ae70beaffcf0e577bd36531c55c76c21063260c65cb2cd0c";
-const ENCODING_OTHER_INTENT_SIGNATURE: vector<u8> =
-    x"57fab9d4f969a7b670d3b1f7f7c17ae7ee8aa780aa610b142e94e1828a45e4b2b527276ac5e5f0dcb9ac66ea83434fbea34827d71fc79ec748d9516705813903";
 
 // === Helpers ===
 
@@ -91,7 +75,7 @@ fun verified(
 fun finish(registry: AudioRegistry, enclave: Enclave<AUDIO_VERIFIER>, audio: Audio<AudioVerifier>) {
     destroy(registry);
     enclave.destroy_for_testing();
-    destroy(audio);
+    audio.freeze();
 }
 
 // === Layout ===
@@ -124,25 +108,10 @@ fun audio_payload_bcs_matches_the_signed_vector() {
     assert_eq!(bcs::to_bytes(&message), AUDIO_MESSAGE);
 }
 
-#[test]
-fun audio_encoding_payload_bcs_matches_the_signed_vector() {
-    let payload = audio_verifier::new_audio_encoding_payload_for_testing(
-        CHANNELS,
-        BIT_DEPTH,
-        SAMPLE_RATE_HZ,
-        SAMPLES_PER_CHANNEL,
-        PCM_DIGEST,
-        BLOB_ID,
-    );
-    assert_eq!(bcs::to_bytes(&payload), ENCODING_PAYLOAD);
-    let message = enclave::create_intent_message(1, SIGNED_AT_MS, payload);
-    assert_eq!(bcs::to_bytes(&message), ENCODING_MESSAGE);
-}
-
 // === Verify Audio ===
 
 #[test]
-fun verify_audio_returns_the_signed_facts_without_an_encoding() {
+fun verify_audio_returns_the_signed_facts() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let (registry, enclave, audio) = verified(&mut scenario);
     assert_eq!(audio.channels(), CHANNELS);
@@ -151,7 +120,6 @@ fun verify_audio_returns_the_signed_facts_without_an_encoding() {
     assert_eq!(audio.samples_per_channel(), SAMPLES_PER_CHANNEL);
     assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
     assert_eq!(audio.duration_ms(), 10_000);
-    assert!(!audio_encoding::has_encoding<_, AudioVerifier>(&audio, BLOB_ID));
     assert_eq!(
         object::id_address(&audio),
         audio::derive_address<AudioVerifier>(
@@ -186,6 +154,20 @@ fun verify_audio_emits_the_verification_and_the_audio() {
     assert_eq!(event::events_by_type<AudioCreatedEvent<AudioVerifier>>().length(), 1);
     assert_eq!(event::num_events(), 2);
     finish(registry, enclave, audio);
+    scenario.end();
+}
+
+#[test]
+fun verified_audio_freezes_with_the_signed_facts() {
+    let mut scenario = test_scenario::begin(PUBLISHER);
+    let (registry, enclave, audio) = verified(&mut scenario);
+    let audio_id = object::id(&audio);
+    finish(registry, enclave, audio);
+    scenario.next_tx(PUBLISHER);
+    let audio = scenario.take_immutable_by_id<Audio<AudioVerifier>>(audio_id);
+    assert_eq!(audio.samples_per_channel(), SAMPLES_PER_CHANNEL);
+    assert_eq!(*audio.pcm_digest(), PCM_DIGEST);
+    test_scenario::return_immutable(audio);
     scenario.end();
 }
 
@@ -252,7 +234,7 @@ fun verify_audio_rejects_a_bad_signature() {
 }
 
 #[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_audio_rejects_the_facts_signed_under_the_encoding_intent() {
+fun verify_audio_rejects_the_facts_signed_under_another_intent() {
     let mut scenario = test_scenario::begin(PUBLISHER);
     let mut registry = audio::new_registry_for_testing(scenario.ctx());
     let enclave = enclave(&mut scenario);
@@ -262,21 +244,6 @@ fun verify_audio_rejects_the_facts_signed_under_the_encoding_intent() {
         SAMPLES_PER_CHANNEL,
         SIGNED_AT_MS,
         AUDIO_OTHER_INTENT_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_audio_rejects_an_encoding_signature() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let mut registry = audio::new_registry_for_testing(scenario.ctx());
-    let enclave = enclave(&mut scenario);
-    let _audio = verify_audio_with(
-        &mut registry,
-        &enclave,
-        SAMPLES_PER_CHANNEL,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
     );
     abort
 }
@@ -297,137 +264,5 @@ fun verify_audio_rejects_another_enclave_key() {
         SIGNED_AT_MS,
         AUDIO_SIGNATURE,
     );
-    abort
-}
-
-// === Verify Encoding ===
-
-#[test]
-fun verify_encoding_registers_the_blob_and_emits_the_verification() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
-    );
-    assert!(audio_encoding::has_encoding<_, AudioVerifier>(&audio, BLOB_ID));
-    let events = event::events_by_type<AudioEncodingVerifiedEvent>();
-    assert_eq!(events.length(), 1);
-    let (
-        enclave_id,
-        policy_version,
-        verified_at_ms,
-        audio_id,
-        blob_id,
-    ) = audio_verifier::audio_encoding_verified_fields_for_testing(&events[0]);
-    assert_eq!(enclave_id, object::id(&enclave));
-    assert_eq!(policy_version, POLICY_VERSION);
-    assert_eq!(verified_at_ms, SIGNED_AT_MS);
-    assert_eq!(audio_id, object::id(&audio));
-    assert_eq!(blob_id, BLOB_ID);
-    assert_eq!(
-        event::events_by_type<
-            AudioEncodingRegisteredEvent<AudioVerifier, AudioVerifier>,
-        >().length(),
-        1,
-    );
-    finish(registry, enclave, audio);
-    scenario.end();
-}
-
-#[test, expected_failure(abort_code = audio_encoding::EEncodingAlreadyRegistered)]
-fun verifying_an_encoding_again_aborts() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (_registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
-    );
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_encoding_rejects_audio_with_other_facts() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let mut registry = audio::new_registry_for_testing(scenario.ctx());
-    let enclave = enclave(&mut scenario);
-    let mut other = audio_verifier::new_audio_for_testing(
-        &mut registry,
-        CHANNELS,
-        BIT_DEPTH,
-        44_100,
-        SAMPLES_PER_CHANNEL,
-        PCM_DIGEST,
-    );
-    audio_verifier::verify_encoding(
-        &mut other,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_encoding_rejects_another_blob() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (_registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID + 1,
-        SIGNED_AT_MS,
-        ENCODING_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_encoding_rejects_another_timestamp() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (_registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS + 1,
-        ENCODING_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_encoding_rejects_the_encoding_signed_under_the_audio_intent() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (_registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(
-        &mut audio,
-        &enclave,
-        BLOB_ID,
-        SIGNED_AT_MS,
-        ENCODING_OTHER_INTENT_SIGNATURE,
-    );
-    abort
-}
-
-#[test, expected_failure(abort_code = enclave::EInvalidSignature)]
-fun verify_encoding_rejects_an_audio_signature() {
-    let mut scenario = test_scenario::begin(PUBLISHER);
-    let (_registry, enclave, mut audio) = verified(&mut scenario);
-    audio_verifier::verify_encoding(&mut audio, &enclave, BLOB_ID, SIGNED_AT_MS, AUDIO_SIGNATURE);
     abort
 }
