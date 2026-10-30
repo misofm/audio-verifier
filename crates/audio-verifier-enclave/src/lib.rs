@@ -1,17 +1,12 @@
 use std::time::Duration;
 
-use audio_verifier::{
-    AudioEncodingPayload, AudioPayload, StreamInfo, blob_id_base64, measure, u256_le_decimal,
-};
+use audio_verifier::{AudioPayload, StreamInfo, measure};
 use axum::{Router, body::Bytes};
 use nautilus::{ConfigError, Intent, NautilusContext, NautilusError, ServerConfig, SignedResponse};
 use serde::{Deserialize, Serialize};
 
 /// Intent of the signed `IntentMessage<AudioPayload>`.
 pub const AUDIO_INTENT: Intent = Intent(0);
-
-/// Intent of the signed `IntentMessage<AudioEncodingPayload>`.
-pub const AUDIO_ENCODING_INTENT: Intent = Intent(1);
 
 /// Default `/process_data` body limit.
 pub const DEFAULT_MAX_BODY_BYTES: usize = 256 * 1024 * 1024;
@@ -67,24 +62,6 @@ impl From<&AudioPayload> for AudioJson {
     }
 }
 
-/// JSON view of an `AudioEncodingPayload` beyond the audio facts, which are in [`AudioJson`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AudioEncodingJson {
-    /// Walrus base64url blob ID.
-    pub blob_id: String,
-    /// Blob ID as the decimal Move `u256`.
-    pub blob_id_u256: String,
-}
-
-impl From<&AudioEncodingPayload> for AudioEncodingJson {
-    fn from(encoding: &AudioEncodingPayload) -> Self {
-        Self {
-            blob_id: blob_id_base64(&encoding.blob_id),
-            blob_id_u256: u256_le_decimal(&encoding.blob_id),
-        }
-    }
-}
-
 /// One signed payload in the `/process_data` response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedJson<T> {
@@ -110,34 +87,24 @@ impl<T> SignedJson<T> {
     }
 }
 
-/// `/process_data` response body: the audio and the file, signed separately.
+/// `/process_data` response body: the signed audio facts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessDataResponse {
     /// The audio facts, for `verify_audio`.
     pub audio: SignedJson<AudioJson>,
-    /// The file's blob ID, for `verify_encoding`; the signed facts are those in `audio`.
-    pub audio_encoding: SignedJson<AudioEncodingJson>,
     /// Enclave Ed25519 public key as hex.
     pub public_key: String,
 }
 
-/// Renders the two signed payloads as the `/process_data` response.
-pub fn response(
-    ctx: &NautilusContext,
-    audio: SignedResponse<AudioPayload>,
-    encoding: SignedResponse<AudioEncodingPayload>,
-) -> ProcessDataResponse {
+/// Renders the signed audio facts as the `/process_data` response.
+pub fn response(ctx: &NautilusContext, audio: SignedResponse<AudioPayload>) -> ProcessDataResponse {
     ProcessDataResponse {
         audio: SignedJson::new(&audio, AudioJson::from(&audio.response.data)),
-        audio_encoding: SignedJson::new(
-            &encoding,
-            AudioEncodingJson::from(&encoding.response.data),
-        ),
         public_key: ctx.public_key_hex(),
     }
 }
 
-/// Measures `bytes` once and signs the audio and the encoding.
+/// Measures `bytes` and signs the audio facts.
 pub fn process(bytes: &[u8], ctx: &NautilusContext) -> Result<ProcessDataResponse, NautilusError> {
     let info = StreamInfo::parse_canonical(bytes)
         .and_then(|info| info.validate().map(|()| info))
@@ -151,10 +118,9 @@ pub fn process(bytes: &[u8], ctx: &NautilusContext) -> Result<ProcessDataRespons
             "decoded PCM exceeds the 4 GiB service limit",
         ));
     }
-    let encoding = measure(bytes).map_err(|error| NautilusError::application(error.to_string()))?;
-    let audio = ctx.sign_intent(AUDIO_INTENT, encoding.audio())?;
-    let encoding = ctx.sign_intent(AUDIO_ENCODING_INTENT, encoding)?;
-    Ok(response(ctx, audio, encoding))
+    let audio = measure(bytes).map_err(|error| NautilusError::application(error.to_string()))?;
+    let audio = ctx.sign_intent(AUDIO_INTENT, audio)?;
+    Ok(response(ctx, audio))
 }
 
 /// Server limits for one request at a time; pass the same value to the router and the listener.

@@ -4,7 +4,6 @@ set -euo pipefail
 cd "$(dirname "$0")"
 FFMPEG="${FFMPEG:-ffmpeg}"
 FLAC="${FLAC:-flac}"
-WALRUS="${WALRUS_CLI:-walrus}"
 STEREO="0.5*sin(2*PI*440*t)+0.05*sin(2*PI*5000*t)|0.4*sin(2*PI*660*t)+0.05*sin(2*PI*7000*t)"
 MONO="0.5*sin(2*PI*440*t)+0.05*sin(2*PI*5000*t)"
 
@@ -60,7 +59,3 @@ encode s16_stereo_44100_short "$STEREO" 44100 0.05 -sample_fmt s16
 encode_libflac libflac_s16_stereo_44100 "$STEREO" 44100 0.25 pcm_s16le
 encode_libflac libflac_s24_stereo_96000 "$STEREO" 96000 0.1 pcm_s24le
 encode_libflac libflac_s16_mono_48000_short "$MONO" 48000 0.0002 pcm_s16le
-
-for file in s16_stereo_44100 s24_stereo_48000 s16_mono_96000; do
-  printf '%s %s\n' "$file" "$("$WALRUS" blob-id --n-shards 1000 --json "${file}.flac" 2>/dev/null | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["blobId"])')"
-done > walrus-blob-ids.txt

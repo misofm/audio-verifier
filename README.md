@@ -1,8 +1,8 @@
 # Nautilus Audio Verifier
 
-Measures FLAC audio inside a Nautilus enclave on AWS Nitro and verifies the signed results on Sui. It checks the decoded audio, computes a BLAKE3 PCM digest and Walrus blob ID, and signs two claims: the audio's channels, bit depth, sample rate, sample count and PCM digest, and, separately, that the file's blob ID is an encoding of that audio.
+Measures FLAC audio inside a Nautilus enclave on AWS Nitro and verifies the signed results on Sui. It checks the decoded audio, computes a BLAKE3 PCM digest, and signs the audio's channels, bit depth, sample rate, sample count and PCM digest. It signs nothing about the file itself.
 
-The Move package verifies the signatures, creates the canonical `Audio<AudioVerifier>` and registers the file as its encoding, for use by other applications. This verifies technical properties of the file; it does not establish authorship, ownership, or availability on Walrus.
+The Move package verifies the signature and creates the canonical, frozen `Audio<AudioVerifier>` for use by other applications. Files are not on-chain: anyone can check a file against an Audio by decoding it and comparing the BLAKE3 digest of its PCM with `pcm_digest`. This verifies technical properties of the audio; it does not establish authorship or ownership.
 
 ## Supported input
 
@@ -35,13 +35,13 @@ curl --fail-with-body http://127.0.0.1:3000/process_data \
   --data-binary @canonical.flac
 ```
 
-The JSON response contains `audio` (the facts, with its `intent` 0, `timestamp_ms` and `signature`), `audio_encoding` (the `blob_id`, as base64url and as a decimal `u256`, with its `intent` 1, `timestamp_ms` and `signature`), and `public_key`. The blob ID refers to the exact uploaded bytes, so use the same canonical file if you store it on Walrus.
+The JSON response contains `audio` (the facts, with its `intent` 0, `timestamp_ms` and `signature`) and `public_key`.
 
 Set the upload limit with `--max-body-bytes` after Cargo's `--`, or with `AUDIO_VERIFIER_MAX_BODY_BYTES`. The service processes one request at a time; concurrent uploads receive HTTP 429. Invalid audio receives HTTP 422 and oversized uploads receive HTTP 413.
 
 ## Use on Sui
 
-Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. For new audio, pass `audio`'s fields, timestamp and signature to `audio_verifier::audio_verifier::verify_audio`, then `audio_encoding`'s blob ID, timestamp and signature to `verify_encoding`. For another file of an existing `Audio<AudioVerifier>`, call only `verify_encoding`. Each checks its signature against the registered enclave.
+Publish the [Move package](move/README.md), configure its enclave policy, and register an attested enclave. For new audio, pass `audio`'s fields, timestamp and signature to `audio_verifier::audio_verifier::verify_audio`, which checks the signature against the registered enclave, then freeze the returned Audio with `audio.freeze()` in the same transaction.
 
 See [move/README.md](move/README.md) for the API and policy setup.
 

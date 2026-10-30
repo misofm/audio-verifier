@@ -1,10 +1,7 @@
 use std::path::Path;
 
-use audio_verifier::AudioEncodingPayload;
-use audio_verifier_enclave::{
-    AUDIO_ENCODING_INTENT, AUDIO_INTENT, AudioEncodingJson, AudioJson, ProcessDataResponse,
-    response,
-};
+use audio_verifier::AudioPayload;
+use audio_verifier_enclave::{AUDIO_INTENT, AudioJson, ProcessDataResponse, response};
 use nautilus::{
     EnclaveIdentity, Intent, NautilusContext, intent_message, testing::FakeAttestor,
     verify_signed_response,
@@ -12,6 +9,8 @@ use nautilus::{
 use serde::Serialize;
 
 const TIMESTAMP_MS: u64 = 1_750_000_000_000;
+
+const OTHER_INTENT: Intent = Intent(1);
 
 #[derive(Serialize)]
 struct Vector<T> {
@@ -25,26 +24,13 @@ struct Vector<T> {
     other_intent_signature: String,
 }
 
-#[derive(Serialize)]
-struct EncodingFields {
-    audio: AudioJson,
-    #[serde(flatten)]
-    encoding: AudioEncodingJson,
-    blob_id_hex: String,
-}
-
-fn fixed_encoding() -> AudioEncodingPayload {
-    let mut blob_id = [0u8; 32];
-    for (index, byte) in blob_id.iter_mut().enumerate() {
-        *byte = index as u8;
-    }
-    AudioEncodingPayload {
+fn fixed_audio() -> AudioPayload {
+    AudioPayload {
         channels: 2,
         bit_depth: 24,
         sample_rate_hz: 48_000,
         samples_per_channel: 480_000,
         pcm_digest: vec![0x11; 32],
-        blob_id,
     }
 }
 
@@ -56,17 +42,11 @@ fn context() -> NautilusContext {
 }
 
 fn signed(ctx: &NautilusContext) -> ProcessDataResponse {
-    let encoding = fixed_encoding();
     let audio = ctx
-        .sign_intent_at(AUDIO_INTENT, TIMESTAMP_MS, encoding.audio())
-        .expect("sign");
-    let encoding = ctx
-        .sign_intent_at(AUDIO_ENCODING_INTENT, TIMESTAMP_MS, encoding)
+        .sign_intent_at(AUDIO_INTENT, TIMESTAMP_MS, fixed_audio())
         .expect("sign");
     verify_signed_response(&ctx.public_key(), AUDIO_INTENT, &audio).expect("audio verifies");
-    verify_signed_response(&ctx.public_key(), AUDIO_ENCODING_INTENT, &encoding)
-        .expect("encoding verifies");
-    response(ctx, audio, encoding)
+    response(ctx, audio)
 }
 
 fn vector<P: Serialize + Clone, T>(
@@ -95,32 +75,18 @@ fn vector<P: Serialize + Clone, T>(
     }
 }
 
-fn vectors() -> (Vector<AudioJson>, Vector<EncodingFields>, NautilusContext) {
+fn audio_vector() -> (Vector<AudioJson>, NautilusContext) {
     let ctx = context();
     let body = signed(&ctx);
-    let encoding = fixed_encoding();
     let audio = vector(
         &ctx,
         AUDIO_INTENT,
-        AUDIO_ENCODING_INTENT,
-        encoding.audio(),
+        OTHER_INTENT,
+        fixed_audio(),
         body.audio.signature,
-        body.audio.data.clone(),
+        body.audio.data,
     );
-    let fields = EncodingFields {
-        audio: body.audio.data,
-        encoding: body.audio_encoding.data,
-        blob_id_hex: hex::encode(encoding.blob_id),
-    };
-    let encoding = vector(
-        &ctx,
-        AUDIO_ENCODING_INTENT,
-        AUDIO_INTENT,
-        encoding,
-        body.audio_encoding.signature,
-        fields,
-    );
-    (audio, encoding, ctx)
+    (audio, ctx)
 }
 
 fn facts_bcs() -> Vec<u8> {
@@ -134,18 +100,9 @@ fn facts_bcs() -> Vec<u8> {
 
 #[test]
 fn audio_payload_bcs_matches_move_layout() {
-    let payload = bcs::to_bytes(&fixed_encoding().audio()).expect("BCS");
+    let payload = bcs::to_bytes(&fixed_audio()).expect("BCS");
     assert_eq!(payload, facts_bcs());
     assert_eq!(payload.len(), 1 + 1 + 4 + 8 + 33);
-}
-
-#[test]
-fn audio_encoding_payload_bcs_matches_move_layout() {
-    let payload = bcs::to_bytes(&fixed_encoding()).expect("BCS");
-    let mut expected = facts_bcs();
-    expected.extend(0u8..32);
-    assert_eq!(payload, expected);
-    assert_eq!(payload.len(), 1 + 1 + 4 + 8 + 33 + 32);
 }
 
 fn assert_signs<T>(vector: &Vector<T>, ctx: &NautilusContext, intent: Intent) {
@@ -175,14 +132,9 @@ fn assert_signs<T>(vector: &Vector<T>, ctx: &NautilusContext, intent: Intent) {
 }
 
 #[test]
-fn vector_signatures_verify_under_their_intent_only() {
-    let (audio, encoding, ctx) = vectors();
+fn vector_signature_verifies_under_its_intent_only() {
+    let (audio, ctx) = audio_vector();
     assert_signs(&audio, &ctx, AUDIO_INTENT);
-    assert_signs(&encoding, &ctx, AUDIO_ENCODING_INTENT);
-    assert_eq!(
-        encoding.fields.encoding.blob_id_u256,
-        "14074904626401341155369551180448584754667373453244490859944217516317499064576"
-    );
 }
 
 fn assert_committed<T: Serialize>(name: &str, vector: &T) {
@@ -198,8 +150,7 @@ fn assert_committed<T: Serialize>(name: &str, vector: &T) {
 }
 
 #[test]
-fn committed_vectors_are_up_to_date() {
-    let (audio, encoding, _) = vectors();
+fn committed_vector_is_up_to_date() {
+    let (audio, _) = audio_vector();
     assert_committed("audio_intent.json", &audio);
-    assert_committed("audio_encoding_intent.json", &encoding);
 }

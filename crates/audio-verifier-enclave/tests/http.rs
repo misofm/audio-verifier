@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use audio_verifier::{blob_id_base64, measure, u256_le_decimal};
+use audio_verifier::measure;
 use audio_verifier_enclave::{
-    AUDIO_ENCODING_INTENT, AUDIO_INTENT, DEFAULT_MAX_BODY_BYTES, ProcessDataResponse, app,
-    max_body_bytes, server_config,
+    AUDIO_INTENT, DEFAULT_MAX_BODY_BYTES, ProcessDataResponse, app, max_body_bytes, server_config,
 };
 use axum::{
     Router,
@@ -51,7 +50,7 @@ async fn json(response: Response<Body>) -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn process_data_signs_the_audio_and_the_encoding() {
+async fn process_data_signs_the_audio() {
     let ctx = context();
     let bytes = fixture();
     let response = app(ctx.clone(), server_config(DEFAULT_MAX_BODY_BYTES))
@@ -63,56 +62,43 @@ async fn process_data_signs_the_audio_and_the_encoding() {
     let value = json(response).await;
     let body: ProcessDataResponse = serde_json::from_value(value.clone()).expect("shape");
 
-    let encoding = measure(&bytes).expect("fixture");
+    let measured = measure(&bytes).expect("fixture");
     assert_eq!(value["audio"]["intent"], AUDIO_INTENT.0);
     assert_eq!(value["audio"]["channels"], 2);
     assert_eq!(value["audio"]["bit_depth"], 16);
     assert_eq!(value["audio"]["sample_rate_hz"], 44_100);
     assert_eq!(value["audio"]["samples_per_channel"], "11025");
     assert!(value["audio"].get("format").is_none());
-    assert!(value["audio"].get("blob_id").is_none());
+    assert_eq!(
+        value
+            .as_object()
+            .expect("object")
+            .keys()
+            .collect::<Vec<_>>(),
+        ["audio", "public_key"]
+    );
     assert_eq!(
         body.audio.data.pcm_digest,
-        hex::encode(&encoding.pcm_digest)
-    );
-    assert_eq!(value["audio_encoding"]["intent"], AUDIO_ENCODING_INTENT.0);
-    assert_eq!(
-        body.audio_encoding.data.blob_id,
-        blob_id_base64(&encoding.blob_id)
-    );
-    assert_eq!(
-        body.audio_encoding.data.blob_id_u256,
-        u256_le_decimal(&encoding.blob_id)
+        hex::encode(&measured.pcm_digest)
     );
     assert_eq!(body.public_key, ctx.public_key_hex());
     assert!(body.audio.timestamp_ms > 1_700_000_000_000);
-    assert!(body.audio_encoding.timestamp_ms >= body.audio.timestamp_ms);
 
     let audio = SignedResponse {
         response: IntentMessage {
             intent: AUDIO_INTENT,
             timestamp_ms: body.audio.timestamp_ms,
-            data: encoding.audio(),
+            data: measured,
         },
         signature: body.audio.signature,
     };
     verify_signed_response(&ctx.public_key(), AUDIO_INTENT, &audio)
         .expect("audio signature verifies over the rebuilt intent message");
-    let encoding = SignedResponse {
-        response: IntentMessage {
-            intent: AUDIO_ENCODING_INTENT,
-            timestamp_ms: body.audio_encoding.timestamp_ms,
-            data: encoding,
-        },
-        signature: body.audio_encoding.signature,
-    };
-    verify_signed_response(&ctx.public_key(), AUDIO_ENCODING_INTENT, &encoding)
-        .expect("encoding signature verifies over the rebuilt intent message");
 }
 
 #[tokio::test]
 async fn bcs_intent_message_body_is_rejected_unsigned() {
-    let audio = measure(&fixture()).expect("fixture").audio();
+    let audio = measure(&fixture()).expect("fixture");
     let message = intent_message(AUDIO_INTENT, 1_750_000_000_000, &audio).expect("BCS");
     let response = app(context(), server_config(DEFAULT_MAX_BODY_BYTES))
         .expect("config")

@@ -1,14 +1,14 @@
 mod common;
 
-use audio_verifier::{AudioEncodingPayload, Error, blob_id_base64, compute_blob_id};
+use audio_verifier::{AudioPayload, Error};
 use common::{
-    FrameEdit, FrameHeader, Rate, Synth, block_sizes, committed_blob_id, decoded_samples, ffmpeg,
-    ffmpeg_raw_pcm, fixture, fixture_path, frame_sizes, pcm_md5, scratch_file, set_block_sizes,
-    set_frame_sizes, set_md5, set_streaminfo, utf8_number, walrus_cli, walrus_cli_blob_id,
+    FrameEdit, FrameHeader, Rate, Synth, block_sizes, decoded_samples, ffmpeg, ffmpeg_raw_pcm,
+    fixture, frame_sizes, pcm_md5, scratch_file, set_block_sizes, set_frame_sizes, set_md5,
+    set_streaminfo, utf8_number,
 };
 
 // Optional migration evidence from the same inputs and assertions as this suite.
-fn measure(bytes: &[u8]) -> Result<AudioEncodingPayload, Error> {
+fn measure(bytes: &[u8]) -> Result<AudioPayload, Error> {
     let result = audio_verifier::measure(bytes);
     if let Some(directory) = std::env::var_os("AUDIO_VERIFIER_MIGRATION_RESULTS") {
         let directory = std::path::PathBuf::from(directory);
@@ -105,7 +105,7 @@ fn flac_name(name: &str) -> String {
 }
 
 fn assert_properties(
-    audio: &AudioEncodingPayload,
+    audio: &AudioPayload,
     channels: u8,
     bit_depth: u8,
     rate: u32,
@@ -118,7 +118,7 @@ fn assert_properties(
     assert_eq!(audio.pcm_digest.len(), 32);
 }
 
-fn assert_matches_ffmpeg(bytes: &[u8], audio: &AudioEncodingPayload, scratch_name: &str) {
+fn assert_matches_ffmpeg(bytes: &[u8], audio: &AudioPayload, scratch_name: &str) {
     let Some(ffmpeg) = ffmpeg() else {
         eprintln!("ffmpeg unavailable, skipping PCM cross-check for {scratch_name}");
         return;
@@ -159,38 +159,11 @@ fn pcm_digest_is_blake3_of_ffmpeg_raw_decode() {
 }
 
 #[test]
-fn blob_id_matches_walrus_cli_output() {
-    for expected in POSITIVE {
-        let name = flac_name(expected.name);
-        let audio = measure(&fixture(&name)).expect(expected.name);
-        assert_eq!(
-            blob_id_base64(&audio.blob_id),
-            committed_blob_id(expected.name)
-        );
-        if let Some(cli) = walrus_cli() {
-            assert_eq!(
-                blob_id_base64(&audio.blob_id),
-                walrus_cli_blob_id(&cli, &fixture_path(&name))
-            );
-        } else {
-            eprintln!("WALRUS_CLI unset, compared {name} against the committed CLI output only");
-        }
-    }
-}
-
-#[test]
 fn synthesized_8_bit_stereo_is_measured() {
     let bytes = Synth::new(2, 8, 44_100).build();
     let audio = measure(&bytes).expect("8-bit");
     assert_properties(&audio, 2, 8, 44_100, 2_500);
     assert_matches_ffmpeg(&bytes, &audio, "s8_stereo_44100.flac");
-    if let Some(cli) = walrus_cli() {
-        let path = scratch_file("s8_stereo_44100.flac", &bytes);
-        assert_eq!(
-            blob_id_base64(&audio.blob_id),
-            walrus_cli_blob_id(&cli, &path)
-        );
-    }
 }
 
 #[test]
@@ -219,13 +192,6 @@ fn frame_rate_encodings_equal_to_streaminfo_are_accepted() {
         let audio = measure(&bytes).unwrap_or_else(|error| panic!("{rate:?}: {error}"));
         assert_eq!(audio.sample_rate_hz, 48_000);
     }
-}
-
-#[test]
-fn blob_id_is_computed_over_the_whole_file() {
-    let bytes = fixture("s16_stereo_44100.flac");
-    let audio = measure(&bytes).expect("fixture");
-    assert_eq!(audio.blob_id, compute_blob_id(&bytes).expect("blob ID"));
 }
 
 #[test]

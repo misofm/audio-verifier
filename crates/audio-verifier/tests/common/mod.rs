@@ -18,17 +18,6 @@ pub fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(fixture_path(name)).expect("fixture")
 }
 
-pub fn committed_blob_id(name: &str) -> String {
-    let listing = std::fs::read_to_string(fixture_path("walrus-blob-ids.txt")).expect("listing");
-    listing
-        .lines()
-        .find_map(|line| {
-            let (file, blob_id) = line.split_once(' ')?;
-            (file == name).then(|| blob_id.to_owned())
-        })
-        .expect("blob ID listed")
-}
-
 pub fn ffmpeg() -> Option<PathBuf> {
     let candidate = env::var_os("FFMPEG")
         .map(PathBuf::from)
@@ -39,11 +28,6 @@ pub fn ffmpeg() -> Option<PathBuf> {
         .ok()
         .filter(|output| output.status.success())
         .map(|_| candidate)
-}
-
-pub fn walrus_cli() -> Option<PathBuf> {
-    let candidate = PathBuf::from(env::var_os("WALRUS_CLI")?);
-    candidate.exists().then_some(candidate)
 }
 
 pub fn scratch_file(name: &str, bytes: &[u8]) -> PathBuf {
@@ -83,17 +67,6 @@ pub fn ffmpeg_raw_pcm(ffmpeg: &Path, flac: &Path, bit_depth: u8) -> Vec<u8> {
         .expect("ffmpeg runs");
     assert!(output.status.success(), "ffmpeg decode failed");
     output.stdout
-}
-
-pub fn walrus_cli_blob_id(cli: &Path, file: &Path) -> String {
-    let output = Command::new(cli)
-        .args(["blob-id", "--n-shards", "1000", "--json"])
-        .arg(file)
-        .output()
-        .expect("walrus CLI runs");
-    assert!(output.status.success(), "walrus blob-id failed");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("CLI JSON");
-    json["blobId"].as_str().expect("blobId").to_owned()
 }
 
 pub fn set_streaminfo(

@@ -95,9 +95,6 @@ pub enum Error {
     /// Decoded PCM MD5 differs from STREAMINFO.
     #[error("PCM MD5 mismatch: STREAMINFO {expected}, decoded {decoded}")]
     Md5Mismatch { expected: String, decoded: String },
-    /// Walrus blob ID computation failed.
-    #[error("Walrus blob ID computation failed: {0}")]
-    BlobId(String),
     /// A boot self-test computed a wrong answer.
     #[error("self-test failed: {0}")]
     SelfTest(&'static str),
